@@ -30,8 +30,13 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 ///      collusion is entirely possible and this contract does nothing to prevent
 ///      it. Do not treat V1 as trust-minimized. The planned fix is Tier 3:
 ///      replacing both the single relayer and the single-owner arbitration with
-///      M-of-N multi-party verification. `Discrepancy` is pre-declared below for
-///      that future use; it is unused in V1.
+///      M-of-N multi-party verification.
+///
+///      Tier 2.5 adds `reportDiscrepancy`, letting the relayer or owner flag a
+///      record as disputed for downstream consumers (see MockLendingPool) to
+///      react to. This is still a centralized signal -- the same relayer/owner
+///      that can misbehave elsewhere in this contract is who decides whether a
+///      discrepancy gets flagged at all.
 contract GapwatchRegistry is Ownable, ReentrancyGuard {
     struct Verification {
         address token;
@@ -64,6 +69,16 @@ contract GapwatchRegistry is Ownable, ReentrancyGuard {
     mapping(bytes32 => Challenge) public challenges;
     mapping(address => uint256) public pendingWithdrawals;
 
+    /// @notice Most recent eventHash recorded for a given token, so a downstream
+    ///         consumer (Tier 2.5) can find "the latest verification for this
+    ///         token" without indexing events off-chain.
+    mapping(address => bytes32) public latestVerificationForToken;
+
+    /// @notice Set once `reportDiscrepancy` has been called for an eventHash.
+    ///         Never cleared -- a flagged discrepancy is permanent history, same
+    ///         as everything else in this registry.
+    mapping(bytes32 => bool) public hasDiscrepancy;
+
     address public relayer;
 
     /// @notice Minimum ETH (wei) the relayer must post with each `recordVerification`
@@ -91,12 +106,14 @@ contract GapwatchRegistry is Ownable, ReentrancyGuard {
     event BondReclaimed(bytes32 indexed eventHash, address indexed relayer, uint256 amount);
     event Withdrawn(address indexed account, uint256 amount);
 
-    /// @notice Reserved for Tier 2.5 downstream consumer contracts to flag a
-    ///         disagreement they observe (e.g. against their own reference model).
-    ///         Declared now for interface stability; no code in V1 emits it.
+    /// @notice Emitted by `reportDiscrepancy` when the relayer or owner flags a
+    ///         recorded event as disputed (e.g. the off-chain Reference Model no
+    ///         longer agrees with what's on-chain). Tier 2.5 downstream consumers
+    ///         (e.g. MockLendingPool) watch for this via `hasDiscrepancy`.
     event Discrepancy(bytes32 indexed eventHash, string reason);
 
     error NotRelayer();
+    error NotAuthorized();
     error ZeroAddress();
     error AlreadyRecorded(bytes32 eventHash);
     error InsufficientBond(uint256 required, uint256 sent);
@@ -111,6 +128,11 @@ contract GapwatchRegistry is Ownable, ReentrancyGuard {
 
     modifier onlyRelayer() {
         if (msg.sender != relayer) revert NotRelayer();
+        _;
+    }
+
+    modifier onlyRelayerOrOwner() {
+        if (msg.sender != relayer && msg.sender != owner()) revert NotAuthorized();
         _;
     }
 
@@ -156,8 +178,19 @@ contract GapwatchRegistry is Ownable, ReentrancyGuard {
             bond: msg.value,
             recordedBy: msg.sender
         });
+        latestVerificationForToken[token] = eventHash;
 
         emit VerificationRecorded(eventHash, token, wasFiltered);
+    }
+
+    /// @notice Flag a recorded event as disputed -- e.g. the off-chain Reference
+    ///         Model (module 5) no longer agrees with what's on-chain. Callable by
+    ///         the relayer or owner; permanent once set, same as every other
+    ///         record in this registry.
+    function reportDiscrepancy(bytes32 eventHash, string calldata reason) external onlyRelayerOrOwner {
+        if (verifications[eventHash].recordedAt == 0) revert NotVerified(eventHash);
+        hasDiscrepancy[eventHash] = true;
+        emit Discrepancy(eventHash, reason);
     }
 
     /// @notice Challenge a record within its challenge window by matching its bond.
