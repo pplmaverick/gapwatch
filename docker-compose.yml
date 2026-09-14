@@ -1,0 +1,6 @@
+services:
+  gapwatch:
+    build: .
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
