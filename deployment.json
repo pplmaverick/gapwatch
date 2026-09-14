@@ -1,0 +1,21 @@
+{
+  "testnet": {
+    "chain_id": 46630,
+    "rpc_url": "https://rpc.testnet.chain.robinhood.com",
+    "GapwatchRegistry": {
+      "address": "0x53f10f96e3F6443e67Af2F1b01144B7e325f006d",
+      "deployed_at_tx": "0x13170d739bb47ee144affb97ac8574feb07617953cd4db2c5762ee958d449c8b",
+      "deployed_at": "2026-09-14"
+    },
+    "MockLendingPool": {
+      "address": "0xF764f545B4e6fF8755EEDEE64A0CFCf2Ec08a671",
+      "deployed_at_tx": "0x07252cab5d5cef4b60572368a54927c742eef29092a009cbd01b032fea10a01c",
+      "deployed_at": "2026-09-14"
+    }
+  },
+  "mainnet": {
+    "chain_id": 4663,
+    "rpc_url": "https://rpc.mainnet.chain.robinhood.com",
+    "note": "Real stock token contracts (e.g. NVDA) live here. Gapwatch's own contracts (GapwatchRegistry, MockLendingPool) are not deployed on mainnet yet."
+  }
+}

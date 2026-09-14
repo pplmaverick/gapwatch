@@ -9,20 +9,31 @@ anything that reads a token's own state (`balanceOfUI`, `uiMultiplier`) must
 use the mainnet RPC. Mixing them up produces a clean "contract not found"
 style failure, not silently wrong data, but it's worth being deliberate
 about which `w3` a given call uses.
+
+Contract addresses are never hardcoded here or anywhere else in the codebase
+-- they come from `deployment.json` at the project root, the one
+git-tracked, authoritative record of "what's deployed where" (matching the
+deployment-address cross-check discipline this project follows). An
+environment variable can override the network selection or the whole
+deployment file path for local experimentation, but the default path is
+always this checked-in file, never a value copy-pasted into a second place.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+from typing import Any
 
 from web3 import Web3
 
-TESTNET_RPC = "https://rpc.testnet.chain.robinhood.com"
-MAINNET_RPC = "https://rpc.mainnet.chain.robinhood.com"
+DEFAULT_DEPLOYMENT_PATH = Path(__file__).resolve().parent.parent / "deployment.json"
 
-REGISTRY_ADDRESS = "0x53f10f96e3F6443e67Af2F1b01144B7e325f006d"
-POOL_ADDRESS = "0xF764f545B4e6fF8755EEDEE64A0CFCf2Ec08a671"
+#: Which network's contract addresses/RPC this process talks to for
+#: GapwatchRegistry/MockLendingPool. Overridable for local testing against a
+#: future re-deploy without editing source.
+NETWORK = os.environ.get("GAPWATCH_NETWORK", "testnet")
 
 _ABI_DIR = Path(__file__).resolve().parent / "abi"
 _REGISTRY_ABI = json.loads((_ABI_DIR / "GapwatchRegistry.json").read_text())
@@ -45,6 +56,24 @@ _BALANCE_OF_UI_ABI = [
 #: User-Agent is set because Cloudflare's bot check (error 1010) rejects
 #: default HTTP client user-agents outright.
 _HEADERS = {"Content-Type": "application/json", "User-Agent": "gapwatch-api/0.1"}
+
+
+def _load_deployment() -> dict[str, Any]:
+    path = Path(os.environ.get("GAPWATCH_DEPLOYMENT_PATH", DEFAULT_DEPLOYMENT_PATH))
+    data = json.loads(path.read_text())
+    if NETWORK not in data:
+        raise KeyError(f"deployment.json has no network {NETWORK!r} (checked {path})")
+    return data
+
+
+_deployment = _load_deployment()
+_network_config = _deployment[NETWORK]
+
+TESTNET_RPC = _deployment["testnet"]["rpc_url"]
+MAINNET_RPC = _deployment["mainnet"]["rpc_url"]
+
+REGISTRY_ADDRESS = _network_config["GapwatchRegistry"]["address"]
+POOL_ADDRESS = _network_config["MockLendingPool"]["address"]
 
 
 def testnet_w3() -> Web3:
