@@ -62,6 +62,17 @@ export function getAuditLog(status?: EventStatus) {
   return getJson<AuditLogResponse>(`/audit-log${qs}`);
 }
 
+export interface EventsListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  events: AuditEvent[];
+}
+
+export function getEvents(limit = 50, offset = 0) {
+  return getJson<EventsListResponse>(`/events?limit=${limit}&offset=${offset}`);
+}
+
 export interface OnchainVerification {
   registry_address: string;
   tx_hash_used_as_event_hash: string;

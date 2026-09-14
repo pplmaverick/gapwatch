@@ -40,3 +40,9 @@ export const KNOWN_TOKENS: KnownToken[] = [
     address: "0x8005d266423c7ea827372c9c864491e5786600ea",
   },
 ];
+
+export function findKnownToken(address: string): KnownToken | undefined {
+  return KNOWN_TOKENS.find(
+    (t) => t.address.toLowerCase() === address.toLowerCase()
+  );
+}
