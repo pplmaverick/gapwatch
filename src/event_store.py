@@ -22,6 +22,16 @@ STATUSES = (
     "l1_confirmed",
 )
 
+#: How this row entered the pipeline. `live_detection` is the default for
+#: every row `insert_pending_event` creates -- i.e. the normal path, a
+#: candidate tx seen on the live sequencer feed. `historical_backfill` marks
+#: a row created by manually replaying an already-known real event through
+#: the same check_event()/verify_event() functions the live loop uses (see
+#: scripts/backfill_known_event.py) -- same verification logic, but the row
+#: did not originate from watching the feed in real time, and callers
+#: (the API, the frontend) must not conflate the two.
+SOURCES = ("live_detection", "historical_backfill")
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +45,8 @@ CREATE TABLE IF NOT EXISTS events (
     last_checked_block INTEGER,
     reference_model_hash TEXT,
     onchain_verified_cache INTEGER,
-    onchain_cache_updated_at TEXT
+    onchain_cache_updated_at TEXT,
+    source TEXT NOT NULL DEFAULT 'live_detection'
 )
 """
 
@@ -48,6 +59,7 @@ _ADDED_COLUMNS = {
     "reference_model_hash": "TEXT",
     "onchain_verified_cache": "INTEGER",
     "onchain_cache_updated_at": "TEXT",
+    "source": "TEXT NOT NULL DEFAULT 'live_detection'",
 }
 
 
@@ -131,6 +143,16 @@ def set_reference_model_hash(conn: sqlite3.Connection, event_id: int, sha256_hex
     conn.execute(
         "UPDATE events SET reference_model_hash = ? WHERE id = ?", (sha256_hex, event_id)
     )
+    conn.commit()
+
+
+def set_source(conn: sqlite3.Connection, event_id: int, source: str) -> None:
+    """Mark how a row entered the pipeline. Only `scripts/backfill_known_event.py`
+    should ever set this to `historical_backfill` -- every other insert leaves it
+    at the schema default (`live_detection`)."""
+    if source not in SOURCES:
+        raise ValueError(f"unknown source: {source!r}")
+    conn.execute("UPDATE events SET source = ? WHERE id = ?", (source, event_id))
     conn.commit()
 
 

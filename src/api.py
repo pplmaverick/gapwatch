@@ -61,6 +61,7 @@ def _event_to_dict(row: sqlite3.Row) -> dict:
         if row["onchain_verified_cache"] is not None
         else None,
         "onchain_cache_updated_at": row["onchain_cache_updated_at"],
+        "source": row["source"],
     }
 
 
