@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS events (
     status TEXT NOT NULL DEFAULT 'pending',
     filter_check_count INTEGER NOT NULL DEFAULT 0,
     last_checked_at TEXT,
-    last_checked_block INTEGER
+    last_checked_block INTEGER,
+    reference_model_hash TEXT
 )
 """
 
@@ -98,3 +99,14 @@ def get_events_by_status(conn: sqlite3.Connection, status: str) -> list[sqlite3.
     if status not in STATUSES:
         raise ValueError(f"unknown status: {status!r}")
     return conn.execute("SELECT * FROM events WHERE status = ? ORDER BY id", (status,)).fetchall()
+
+
+def get_event_by_id(conn: sqlite3.Connection, event_id: int) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+
+
+def set_reference_model_hash(conn: sqlite3.Connection, event_id: int, sha256_hex: str) -> None:
+    conn.execute(
+        "UPDATE events SET reference_model_hash = ? WHERE id = ?", (sha256_hex, event_id)
+    )
+    conn.commit()
