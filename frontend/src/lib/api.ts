@@ -1,5 +1,7 @@
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+// Always same-origin, same-protocol -- see the rewrite in next.config.ts for
+// where this actually goes server-side. The browser must never be given the
+// real (HTTP) backend URL directly, or HTTPS pages block it as mixed content.
+const API_BASE_URL = "/api/backend";
 
 export class ApiError extends Error {
   status: number;
