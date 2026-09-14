@@ -19,6 +19,7 @@ from __future__ import annotations
 import sqlite3
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from requests.exceptions import RequestException
 from web3.exceptions import Web3Exception
 
@@ -28,6 +29,16 @@ from src.registry_client import event_hash_to_bytes32, mainnet_w3, registry_cont
 app = FastAPI(
     title="Gapwatch API",
     description="Independent on-chain verification for Robinhood Chain corporate actions",
+)
+
+# Every endpoint here is a public, unauthenticated read of public blockchain/SQLite
+# data (no cookies, no auth headers) -- wildcard CORS is safe and avoids re-locking
+# this down every time the frontend's deployment origin changes.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET"],
+    allow_headers=["*"],
 )
 
 

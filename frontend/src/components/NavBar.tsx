@@ -17,6 +17,12 @@ export function NavBar() {
         </Link>
         <nav className="flex items-center gap-6 text-sm text-foreground-muted">
           <Link
+            href="/balances"
+            className="transition-colors hover:text-interactive"
+          >
+            Balances
+          </Link>
+          <Link
             href="/feed"
             className="transition-colors hover:text-interactive"
           >
