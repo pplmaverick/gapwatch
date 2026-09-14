@@ -2,6 +2,7 @@
 
 import { AuditEvent } from "@/lib/api";
 import { findKnownToken } from "@/lib/tokens";
+import { backfillLabel } from "@/lib/knownBackfills";
 
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -61,12 +62,14 @@ export function AuditLogTable({ events }: { events: AuditEvent[] }) {
             <th className="py-3 pr-4 font-medium">Detected</th>
             <th className="py-3 pr-4 font-medium">Block</th>
             <th className="py-3 pr-4 font-medium">Checks</th>
-            <th className="py-3 pr-0 font-medium">Tx hash</th>
+            <th className="py-3 pr-4 font-medium">Tx hash</th>
+            <th className="py-3 pr-0 font-medium">Source</th>
           </tr>
         </thead>
         <tbody>
           {events.map((event) => {
             const token = findKnownToken(event.token_address);
+            const backfillText = backfillLabel(event);
             return (
               <tr
                 key={event.id}
@@ -90,8 +93,11 @@ export function AuditLogTable({ events }: { events: AuditEvent[] }) {
                 <td className="py-3 pr-4 font-mono text-[12px] text-foreground-muted">
                   {event.filter_check_count}
                 </td>
-                <td className="py-3 pr-0 font-mono text-[12px] text-foreground-dim">
+                <td className="py-3 pr-4 font-mono text-[12px] text-foreground-dim">
                   {shortAddress(event.tx_hash)}
+                </td>
+                <td className="py-3 pr-0 text-[11px] italic text-foreground-dim">
+                  {backfillText ?? ""}
                 </td>
               </tr>
             );

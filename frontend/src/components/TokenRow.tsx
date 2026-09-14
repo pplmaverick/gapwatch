@@ -10,6 +10,7 @@ import {
   getTokenBalance,
 } from "@/lib/api";
 import { KnownToken } from "@/lib/tokens";
+import { backfillLabel } from "@/lib/knownBackfills";
 
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -17,6 +18,22 @@ function shortAddress(addr: string) {
 
 function formatMultiplier(raw: number) {
   return (raw / 1e18).toFixed(6);
+}
+
+function formatDate(iso: string) {
+  // Fixed locale/timezone -- not the runtime default -- so server and client
+  // render the same string on first paint (see PipelineStatusBar for the
+  // hydration mismatch this avoids).
+  return (
+    new Date(iso).toLocaleString("en-US", {
+      timeZone: "UTC",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }) + " UTC"
+  );
 }
 
 interface Props {
@@ -177,8 +194,14 @@ export function TokenRow({ token, holderAddress, matchedEvents }: Props) {
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-foreground-muted">
                           <span className="font-mono">{shortAddress(event.tx_hash)}</span>
                           <span>block {event.block_number}</span>
-                          <span>{new Date(event.detected_at).toLocaleString()}</span>
+                          <span>{formatDate(event.detected_at)}</span>
                         </div>
+
+                        {backfillLabel(event) && (
+                          <p className="mt-1 text-[11px] italic text-foreground-dim">
+                            {backfillLabel(event)}
+                          </p>
+                        )}
 
                         {detail === "loading" && (
                           <p className="mt-2 text-[12px] text-foreground-dim">

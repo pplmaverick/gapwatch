@@ -3,17 +3,8 @@
 import { motion } from "motion/react";
 import { AuditEvent } from "@/lib/api";
 import { findKnownToken } from "@/lib/tokens";
-import { findBackfill } from "@/lib/knownBackfills";
+import { backfillLabel } from "@/lib/knownBackfills";
 import { PipelineStatusBar } from "./PipelineStatusBar";
-
-function formatBroadcastDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -26,7 +17,7 @@ interface Props {
 
 export function EventCard({ event, focal }: Props) {
   const token = findKnownToken(event.token_address);
-  const backfill = findBackfill(event.tx_hash);
+  const backfillText = backfillLabel(event);
 
   return (
     <motion.div
@@ -74,11 +65,10 @@ export function EventCard({ event, focal }: Props) {
         )}
       </div>
 
-      {backfill && (
+      {backfillText && (
         <p className="mb-4 text-[11px] italic leading-relaxed text-foreground-dim">
-          Verified from historical broadcast ({formatBroadcastDate(backfill.broadcastAt)})
-          — replayed through the verifier manually, not caught by a live-running
-          feed listener.
+          {backfillText} — replayed through the verifier manually, not caught
+          by a live-running feed listener.
         </p>
       )}
 

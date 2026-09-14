@@ -1,12 +1,10 @@
-// Some rows in events.db were not caught by a live-running feed listener --
-// they were verified by manually replaying a known historical broadcast
-// through filter_verifier.check_event()/l1_confirmer.check_event() directly,
-// bypassing main.py's state-machine loop. Confirmed 2026-09-14 by comparing
-// detected_at/last_checked_at against the real on-chain broadcast time (5
-// days apart) and against the 15s-sleep + 2-block-gap timing main.py's loop
-// requires (3 filter checks + L1 confirmation in 4.45s is not physically
-// possible through that loop). Recorded here so the UI can say so plainly
-// instead of implying every row was caught in real time.
+import { AuditEvent } from "./api";
+
+// The authoritative signal for "was this row caught live or manually
+// replayed" is the API's own `source` field (see scripts/backfill_known_event.py
+// and event_store.SOURCES in the backend) -- not this file. This file only
+// supplies the human-readable real broadcast date for known backfilled tx
+// hashes, since that date isn't itself a column in events.db.
 export interface KnownBackfill {
   txHash: string;
   broadcastAt: string; // real on-chain broadcast time, not detected_at
@@ -21,4 +19,26 @@ export const KNOWN_BACKFILLS: KnownBackfill[] = [
 
 export function findBackfill(txHash: string): KnownBackfill | undefined {
   return KNOWN_BACKFILLS.find((b) => b.txHash.toLowerCase() === txHash.toLowerCase());
+}
+
+export function isHistoricalBackfill(event: AuditEvent): boolean {
+  return event.source === "historical_backfill";
+}
+
+function formatBroadcastDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+// Single canonical wording, reused by Screen A/B/C so none of them drift.
+export function backfillLabel(event: AuditEvent): string | null {
+  if (!isHistoricalBackfill(event)) return null;
+  const known = findBackfill(event.tx_hash);
+  return known
+    ? `Verified from historical broadcast (${formatBroadcastDate(known.broadcastAt)})`
+    : "Verified from a historical broadcast";
 }

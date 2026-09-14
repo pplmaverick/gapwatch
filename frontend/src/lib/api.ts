@@ -38,6 +38,8 @@ export type EventStatus =
   | "filtered"
   | "l1_confirmed";
 
+export type EventSource = "live_detection" | "historical_backfill";
+
 export interface AuditEvent {
   id: number;
   token_address: string;
@@ -50,6 +52,7 @@ export interface AuditEvent {
   reference_model_hash: string | null;
   onchain_verified_cache: boolean | null;
   onchain_cache_updated_at: string | null;
+  source: EventSource;
 }
 
 export interface AuditLogResponse {
