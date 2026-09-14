@@ -28,6 +28,12 @@ export function NavBar() {
           >
             Live feed
           </Link>
+          <Link
+            href="/audit-log"
+            className="transition-colors hover:text-interactive"
+          >
+            Audit log
+          </Link>
           <a
             href="https://github.com/pplmaverick/gapwatch"
             target="_blank"
