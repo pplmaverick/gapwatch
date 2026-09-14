@@ -4,8 +4,16 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.141.1",
     "rhfeed",
+    "uvicorn>=0.52.4",
+    "web3>=8.0.0",
 ]
 
 [tool.uv.sources]
 rhfeed = { git = "https://github.com/chainstacklabs/robinhood-chain-sequencer-feed", rev = "afb30913858b21b89187003f376ec91038fd9205" }
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.12.0",
+]

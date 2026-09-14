@@ -7,10 +7,18 @@ import logging
 
 from rhfeed import MAINNET_FEED, FeedConsumer
 
-from src.event_store import connect, get_events_by_status, get_pending_events, insert_pending_event
+from src.event_store import (
+    connect,
+    get_all_events,
+    get_events_by_status,
+    get_pending_events,
+    insert_pending_event,
+    set_onchain_cache,
+)
 from src.filter_engine import FilterEngine
 from src.filter_verifier import check_event as filter_verifier_check
 from src.l1_confirmer import check_event as l1_confirmer_check
+from src.registry_client import event_hash_to_bytes32, registry_contract, testnet_w3
 from src.token_registry import build_registry
 
 _log = logging.getLogger("gapwatch.main")
@@ -19,9 +27,35 @@ _log = logging.getLogger("gapwatch.main")
 STATE_MACHINE_INTERVAL_SECONDS = 15
 
 
+def _refresh_onchain_cache(conn) -> None:
+    """Sync `onchain_verified_cache` for display purposes only (GET /events list
+    view). `isVerified` is monotonic -- once true, always true, since recordedAt
+    is never cleared even after a challenge -- so a row already cached true is
+    never re-checked. Never treated as ground truth: GET /events/{id} always
+    re-reads the chain directly regardless of what this column says."""
+    try:
+        w3 = testnet_w3()
+        registry = registry_contract(w3)
+    except Exception as exc:  # noqa: BLE001 -- cache refresh must never crash the loop
+        _log.warning("onchain cache refresh: could not connect: %s", exc)
+        return
+
+    for row in get_all_events(conn):
+        if row["onchain_verified_cache"]:
+            continue
+        try:
+            event_hash = event_hash_to_bytes32(row["tx_hash"])
+            verified = registry.functions.isVerified(event_hash).call()
+        except Exception as exc:  # noqa: BLE001 -- one bad row must not block the rest
+            _log.warning("onchain cache refresh failed for event id=%d: %s", row["id"], exc)
+            continue
+        if verified != bool(row["onchain_verified_cache"]):
+            set_onchain_cache(conn, row["id"], verified)
+
+
 async def state_machine_loop(conn, get_current_block) -> None:
     """Periodically advance every non-terminal event through filter_verifier and
-    l1_confirmer, in that order."""
+    l1_confirmer, in that order, then refresh the display-only on-chain cache."""
     while True:
         await asyncio.sleep(STATE_MACHINE_INTERVAL_SECONDS)
         current_block = get_current_block()
@@ -38,6 +72,8 @@ async def state_machine_loop(conn, get_current_block) -> None:
 
         for event in get_events_by_status(conn, "confirmed_not_filtered"):
             l1_confirmer_check(conn, event)
+
+        _refresh_onchain_cache(conn)
 
 
 async def run(url: str = MAINNET_FEED) -> None:

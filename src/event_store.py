@@ -33,9 +33,30 @@ CREATE TABLE IF NOT EXISTS events (
     filter_check_count INTEGER NOT NULL DEFAULT 0,
     last_checked_at TEXT,
     last_checked_block INTEGER,
-    reference_model_hash TEXT
+    reference_model_hash TEXT,
+    onchain_verified_cache INTEGER,
+    onchain_cache_updated_at TEXT
 )
 """
+
+
+#: Columns added after the table's first release. `CREATE TABLE IF NOT EXISTS`
+#: only helps a brand-new database -- an existing `events.db` from an earlier
+#: tier needs these added explicitly, or code expecting them raises immediately.
+_ADDED_COLUMNS = {
+    "last_checked_block": "INTEGER",
+    "reference_model_hash": "TEXT",
+    "onchain_verified_cache": "INTEGER",
+    "onchain_cache_updated_at": "TEXT",
+}
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    existing = {row["name"] for row in conn.execute("PRAGMA table_info(events)")}
+    for column, coltype in _ADDED_COLUMNS.items():
+        if column not in existing:
+            conn.execute(f"ALTER TABLE events ADD COLUMN {column} {coltype}")
+    conn.commit()
 
 
 def connect(db_path: Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
@@ -44,6 +65,7 @@ def connect(db_path: Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute(_SCHEMA)
     conn.commit()
+    _migrate(conn)
     return conn
 
 
@@ -108,5 +130,25 @@ def get_event_by_id(conn: sqlite3.Connection, event_id: int) -> sqlite3.Row | No
 def set_reference_model_hash(conn: sqlite3.Connection, event_id: int, sha256_hex: str) -> None:
     conn.execute(
         "UPDATE events SET reference_model_hash = ? WHERE id = ?", (sha256_hex, event_id)
+    )
+    conn.commit()
+
+
+def get_all_events(conn: sqlite3.Connection, status: str | None = None) -> list[sqlite3.Row]:
+    """All events, optionally filtered by status. Used by the audit log."""
+    if status is not None:
+        if status not in STATUSES:
+            raise ValueError(f"unknown status: {status!r}")
+        return conn.execute("SELECT * FROM events WHERE status = ? ORDER BY id", (status,)).fetchall()
+    return conn.execute("SELECT * FROM events ORDER BY id").fetchall()
+
+
+def set_onchain_cache(conn: sqlite3.Connection, event_id: int, verified: bool) -> None:
+    """Performance-only cache of the on-chain `isVerified` result. Never treated as
+    the source of truth -- see `GET /events/{id}`, which always re-checks the
+    chain directly rather than trusting this column."""
+    conn.execute(
+        "UPDATE events SET onchain_verified_cache = ?, onchain_cache_updated_at = ? WHERE id = ?",
+        (1 if verified else 0, _now(), event_id),
     )
     conn.commit()
