@@ -11,6 +11,15 @@
       "address": "0xF764f545B4e6fF8755EEDEE64A0CFCf2Ec08a671",
       "deployed_at_tx": "0x07252cab5d5cef4b60572368a54927c742eef29092a009cbd01b032fea10a01c",
       "deployed_at": "2026-09-14"
+    },
+    "stylus": {
+      "network": "robinhoodTestnet",
+      "address": "0xef33b95c009ca3c7021c294567237ce08679c0f1",
+      "deployed_at_tx": "0xf0825144391d02e1ab4f87ff8fcea305e64b3cebe14f21395f5d2ae21d592a8f",
+      "activated_at_tx": "0x6364aacac97f1249f4ae6dd0a5b4922be331f593ade35ce4daacdcb7d4ecc406",
+      "deployed_at": "2026-09-14",
+      "purpose": "feasibility-test-only",
+      "note": "cargo stylus new default Counter scaffold, not customized. This address collides (same deployer nonce, different chain) with an unrelated project (SpaceFinance on Creditcoin CC3 Testnet) -- always qualify by network when referencing it. See docs/tier4-stylus-verification.md."
     }
   },
   "mainnet": {
