@@ -18,7 +18,10 @@ function formatTime(iso: string | null) {
   }) + " UTC";
 }
 
-type DotState = "pending" | "active" | "done" | "failed";
+// "fact" = a neutral, factual thing that happened (e.g. detection) -- not a
+// verification claim, so it must never render in the semantic-confirmed
+// (mint) color reserved for "done". Only "done" gets that color.
+type DotState = "pending" | "active" | "fact" | "done" | "failed";
 
 function Dot({ state }: { state: DotState }) {
   const color =
@@ -26,15 +29,20 @@ function Dot({ state }: { state: DotState }) {
       ? "var(--semantic-confirmed)"
       : state === "failed"
         ? "#f87171"
-        : state === "active"
-          ? "var(--foreground-muted)"
-          : "var(--foreground-dim)";
+        : state === "fact"
+          ? "var(--foreground)"
+          : state === "active"
+            ? "var(--foreground-muted)"
+            : "var(--foreground-dim)";
 
   return (
     <motion.span
       className="relative flex h-3 w-3 shrink-0 items-center justify-center rounded-full"
       animate={{
-        background: state === "done" || state === "failed" ? color : "transparent",
+        background:
+          state === "done" || state === "failed" || state === "fact"
+            ? color
+            : "transparent",
         borderColor: color,
         scale: state === "active" ? [1, 1.15, 1] : 1,
       }}
@@ -94,7 +102,7 @@ export function PipelineStatusBar({ event, emphasized }: Props) {
     event.status === "confirmed_not_filtered" || event.status === "l1_confirmed";
   const isL1Confirmed = event.status === "l1_confirmed";
 
-  const stage1Dot: DotState = "done"; // detection is always a fact once the row exists
+  const stage1Dot: DotState = "fact"; // a neutral fact (seen on feed), not a verification claim
   const stage2Dot: DotState = isFiltered
     ? "failed"
     : isVerified
