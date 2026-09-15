@@ -11,3 +11,7 @@ wheels/
 
 # Runtime state (token registry scan checkpoint), not source
 /data/
+
+# Tier 3 node keystores -- never commit private key material
+/.keystores/
+/.keystores-mainnet/

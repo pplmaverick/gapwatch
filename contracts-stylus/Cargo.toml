@@ -17,6 +17,10 @@ export-abi = ["stylus-sdk/export-abi"]
 debug = ["stylus-sdk/debug"]
 mini-alloc = ["stylus-sdk/mini-alloc"]
 contract-client-gen = []
+# Enables stylus_sdk::testing (TestVM) for `cargo test --features test-utils`.
+# Not part of `default` -- pulls in std-assuming deps (rclite) that have no
+# business in the release wasm32 build.
+test-utils = ["stylus-sdk/stylus-test"]
 
 [profile.release]
 codegen-units = 1
