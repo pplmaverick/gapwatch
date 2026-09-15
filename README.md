@@ -62,35 +62,55 @@ This is not a project ported from another chain. Each design decision maps to a 
 
 ## Architecture
 
-```
-                         Robinhood Chain
-                                │
-        ┌───────────────────────┴────────────────────────┐
-        │              raw sequencer feed                │
-        └───────────────────────┬────────────────────────┘
-                                │
-  ┌─────────────────────────────▼──────────────────────────────┐
-  │ OFF-CHAIN PIPELINE                                         │
-  │                                                            │
-  │  1  feed_listener     decode frames from the feed          │
-  │  2  filter_engine     match against dynamic token registry │
-  │  3  filter_verifier   ArbFilteredTransactionsManager 0x74  │
-  │  4  l1_confirmer      confirm via UIMultiplierUpdated log  │
-  │  5  reference_model   independent recompute + SHA-256 seal │
-  │  6  event_store       SQLite persistence                   │
-  │  7  api               FastAPI, hybrid source of truth      │
-  │  8  frontend          Next.js — Screens A / B / C          │
-  └─────────────────────────────┬──────────────────────────────┘
-                                │ 2-of-3 node signatures
-  ┌─────────────────────────────▼──────────────────────────────┐
-  │ ON-CHAIN CONTRACT LAYER                                    │
-  │                                                            │
-  │  Tier 1   GapwatchRegistry     append-only record          │
-  │  Tier 2   + challenge bond     economic dispute mechanism  │
-  │  Tier 2.5 MockLendingPool      downstream consumer demo    │
-  │  Tier 3   GapwatchRegistryV2   M-of-N consensus writes     │
-  │  Tier 4   ConsensusVerifier    Stylus / Rust, called by ▲  │
-  └────────────────────────────────────────────────────────────┘
+Two things are true on Robinhood Chain at once: the off-chain pipeline sees every candidate transaction on the raw sequencer feed — including ones the chain will exclude and no RPC will ever show — but nothing it concludes becomes on-chain truth without 2-of-3 node signatures. The diagram below shows what crosses that boundary and what never does.
+
+```mermaid
+flowchart TD
+    FEED[["Robinhood Chain · raw sequencer feed"]]
+
+    subgraph OFF["OFF-CHAIN PIPELINE — sees candidates before the chain can exclude them"]
+        direction LR
+        M1["1 · feed_listener<br/>decode frames from the feed"]
+        M2["2 · filter_engine<br/>match against dynamic token registry"]
+        M3["3 · filter_verifier<br/>ArbFilteredTransactionsManager · 0x74"]
+        M4["4 · l1_confirmer<br/>confirm via UIMultiplierUpdated log"]
+        M5["5 · reference_model<br/>independent recompute + SHA-256 seal"]
+        M6["6 · event_store<br/>SQLite persistence"]
+        M7["7 · api<br/>FastAPI · hybrid source of truth"]
+        M8["8 · frontend<br/>Next.js · Screens A / B / C"]
+        M1 --> M2 --> M3 --> M4 --> M5 --> M6 --> M7 --> M8
+    end
+
+    GATE{{"2-of-3 node signatures<br/>digest bound to contract address + chainid"}}
+
+    subgraph ON["ON-CHAIN CONTRACT LAYER — only a signed consensus result lands here"]
+        direction LR
+        T3["Tier 3 · GapwatchRegistryV2<br/>consensus-gated writes · mainnet"]
+        T4{{"Tier 4 · ConsensusVerifier<br/>Stylus / Rust · ecrecover<br/>dedup by recovered address"}}
+        T25["Tier 2.5 · MockLendingPool<br/>downstream consumer demo"]
+        T12["Tier 1+2 · GapwatchRegistry<br/>append-only record + challenge bond · testnet"]
+
+        T3 -- "every signature check" --> T4
+        T3 -- "discrepancy signal · read via latestVerificationForToken" --> T25
+        T12 -. "V1 lineage · superseded by" .-> T3
+    end
+
+    FEED --> OFF
+    OFF -- "verified result + reference-model hash" --> GATE
+    GATE -- "recordVerification · resolveChallenge · reportDiscrepancy" --> ON
+
+    classDef offchain fill:#e8f1fb,stroke:#4a7fb5,color:#11304d
+    classDef onchain fill:#e7f6ec,stroke:#3f9d5d,color:#0f3d22
+    classDef gate fill:#f7e3b0,stroke:#b58a2a,color:#3a2b06
+    classDef source fill:#ececf2,stroke:#8b8ba0,color:#2a2a3a
+
+    class M1,M2,M3,M4,M5,M6,M7,M8 offchain
+    class T3,T25,T12 onchain
+    class T4,GATE gate
+    class FEED source
+
+    style OFF fill:#f4f9ff,stroke:#4a7fb5,stroke-width:2px,color:#11304d
+    style ON fill:#f2fbf5,stroke:#3f9d5d,stroke-width:2px,color:#0f3d22
 ```
 
 Tier 3 and Tier 4 ship together: `GapwatchRegistryV2` (Solidity) delegates every
