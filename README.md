@@ -65,39 +65,40 @@ This is not a project ported from another chain. Each design decision maps to a 
 Two things are true on Robinhood Chain at once: the off-chain pipeline sees every candidate transaction on the raw sequencer feed — including ones the chain will exclude and no RPC will ever show — but nothing it concludes becomes on-chain truth without 2-of-3 node signatures. The diagram below shows what crosses that boundary and what never does.
 
 ```mermaid
+%%{init: {'flowchart': {'nodeSpacing': 20, 'rankSpacing': 25}}}%%
 flowchart TD
     FEED[["Robinhood Chain · raw sequencer feed"]]
 
-    subgraph OFF["OFF-CHAIN PIPELINE — sees candidates before the chain can exclude them"]
-        direction LR
+    subgraph OFF["OFF-CHAIN PIPELINE — sees candidates before the chain excludes them"]
+        direction TB
         M1["1 · feed_listener<br/>decode frames from the feed"]
         M2["2 · filter_engine<br/>match against dynamic token registry"]
-        M3["3 · filter_verifier<br/>ArbFilteredTransactionsManager · 0x74"]
-        M4["4 · l1_confirmer<br/>confirm via UIMultiplierUpdated log"]
-        M5["5 · reference_model<br/>independent recompute + SHA-256 seal"]
+        M3["3 · filter_verifier<br/>filter precompile · 0x74"]
+        M4["4 · l1_confirmer<br/>confirm UIMultiplierUpdated"]
+        M5["5 · reference_model<br/>independent recompute + SHA-256"]
         M6["6 · event_store<br/>SQLite persistence"]
-        M7["7 · api<br/>FastAPI · hybrid source of truth"]
+        M7["7 · api<br/>FastAPI · hybrid truth source"]
         M8["8 · frontend<br/>Next.js · Screens A / B / C"]
         M1 --> M2 --> M3 --> M4 --> M5 --> M6 --> M7 --> M8
     end
 
-    GATE{{"2-of-3 node signatures<br/>digest bound to contract address + chainid"}}
+    GATE{{"2-of-3 node signatures<br/>digest bound to contract + chainid"}}
 
     subgraph ON["ON-CHAIN CONTRACT LAYER — only a signed consensus result lands here"]
-        direction LR
+        direction TB
         T3["Tier 3 · GapwatchRegistryV2<br/>consensus-gated writes · mainnet"]
-        T4{{"Tier 4 · ConsensusVerifier<br/>Stylus / Rust · ecrecover<br/>dedup by recovered address"}}
+        T4{{"Tier 4 · ConsensusVerifier<br/>Stylus / Rust · ecrecover"}}
         T25["Tier 2.5 · MockLendingPool<br/>downstream consumer demo"]
-        T12["Tier 1+2 · GapwatchRegistry<br/>append-only record + challenge bond · testnet"]
+        T12["Tier 1+2 · GapwatchRegistry<br/>append-only + bond · testnet"]
 
         T3 -- "every signature check" --> T4
-        T3 -- "discrepancy signal · read via latestVerificationForToken" --> T25
+        T3 -- "discrepancy signal" --> T25
         T12 -. "V1 lineage · superseded by" .-> T3
     end
 
     FEED --> OFF
-    OFF -- "verified result + reference-model hash" --> GATE
-    GATE -- "recordVerification · resolveChallenge · reportDiscrepancy" --> ON
+    OFF -- "verified result + hash" --> GATE
+    GATE -- "recordVerification · resolveChallenge<br/>reportDiscrepancy" --> ON
 
     classDef offchain fill:#e8f1fb,stroke:#4a7fb5,color:#11304d
     classDef onchain fill:#e7f6ec,stroke:#3f9d5d,color:#0f3d22
