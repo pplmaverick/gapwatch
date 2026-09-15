@@ -65,25 +65,20 @@ This is not a project ported from another chain. Each design decision maps to a 
 Two things are true on Robinhood Chain at once: the off-chain pipeline sees every candidate transaction on the raw sequencer feed — including ones the chain will exclude and no RPC will ever show — but nothing it concludes becomes on-chain truth without 2-of-3 node signatures. The diagram below shows what crosses that boundary and what never does.
 
 ```mermaid
-%%{init: {"flowchart": {"nodeSpacing": 10, "rankSpacing": 10}}}%%
+%%{init: {"flowchart": {"nodeSpacing": 6, "rankSpacing": 6}}}%%
 flowchart LR
     A[["Robinhood Chain<br/>raw sequencer feed"]]
     B["Off-chain pipeline<br/>filter · verify<br/>reference model"]
     C{{"2-of-3 node<br/>consensus"}}
-    D["GapwatchRegistryV2<br/>on-chain record"]
-    E{{"ConsensusVerifier<br/>Stylus/Rust"}}
-
+    D["GapwatchRegistryV2<br/>on-chain record<br/>signature check in<br/>ConsensusVerifier (Stylus)"]
     A --> B --> C --> D
-    D -- "every<br/>signature check" --> E
-
     classDef offchain fill:#e8f1fb,stroke:#4a7fb5,color:#11304d
     classDef onchain fill:#e7f6ec,stroke:#3f9d5d,color:#0f3d22
     classDef gate fill:#f7e3b0,stroke:#b58a2a,color:#3a2b06
     classDef source fill:#ececf2,stroke:#8b8ba0,color:#2a2a3a
-
     class B offchain
     class D onchain
-    class C,E gate
+    class C gate
     class A source
 ```
 
