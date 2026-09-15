@@ -1,5 +1,6 @@
 # Gapwatch
 
+![CI](https://github.com/pplmaverick/gapwatch/actions/workflows/ci.yml/badge.svg)
 ![Network](https://img.shields.io/badge/Robinhood_Chain_Mainnet-4663-blue)
 ![Solidity](https://img.shields.io/badge/Solidity-0.8.30-purple)
 ![Rust](https://img.shields.io/badge/Rust_Stylus-stylus--sdk_0.10.9-orange)
@@ -8,6 +9,12 @@
 Independent on-chain verification for Robinhood Chain corporate actions — watches the raw sequencer feed for stock-token multiplier updates, re-computes them against an independent Reference Model, and seals the result on-chain behind a 2-of-3 node consensus. Purpose-built for Robinhood Chain: every layer depends on a chain-native capability (the ArbOS compliance-filtering precompile, the raw sequencer feed, Stylus) and has no meaningful equivalent on a generic EVM chain.
 
 **Status:** Core pipeline and consensus layer live on mainnet; ongoing hardening per Test Coverage & Known Limitations below.
+
+## 🌐 Live Demo
+
+https://gapwatch-app.vercel.app
+
+**Current mainnet contract:** GapwatchRegistryV2 `0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137` · Full deployment history, tx hashes, and constructor args: [deployment.json](./deployment.json)
 
 **Deployed on Robinhood Chain (mainnet + testnet)**
 
