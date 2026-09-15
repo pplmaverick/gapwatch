@@ -14,7 +14,7 @@ jobs:
       # `contracts/lib/` (forge-std, openzeppelin-contracts) is vendored as
       # ordinary tracked files, not git submodules -- a plain checkout is
       # enough and no `forge install` step is needed.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: foundry-rs/foundry-toolchain@v1
         with:
@@ -32,7 +32,7 @@ jobs:
     name: Rust / Stylus (cargo test)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # No toolchain action needed: `contracts-stylus/rust-toolchain.toml`
       # pins channel 1.91.0 and declares the wasm32-unknown-unknown target,
