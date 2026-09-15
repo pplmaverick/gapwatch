@@ -25,6 +25,34 @@
   "mainnet": {
     "chain_id": 4663,
     "rpc_url": "https://rpc.mainnet.chain.robinhood.com",
-    "note": "Real stock token contracts (e.g. NVDA) live here. Gapwatch's own contracts (GapwatchRegistry, MockLendingPool) are not deployed on mainnet yet."
+    "note": "Real stock token contracts (e.g. NVDA) live here (chainId 4663). Gapwatch's own contracts (ConsensusVerifier, GapwatchRegistryV2, MockLendingPool) are now also deployed here as of 2026-09-15.",
+    "ConsensusVerifier": {
+      "address": "0x6A7061D3f754BB594ed5092815Ae9bD71DD185b7",
+      "deployed_at_tx": "0x2085b22c4f9036f07e0d6b1397879edf9a105ad349b261e210741b2eb95eba03",
+      "activated_at_tx": "0xb184d20c82dc18cda6aea6ee77984b839dfa8e188304ffbf32bc33e173e13fba",
+      "deployed_at": "2026-09-15",
+      "note": "CREATE nonce collision: same address on Creditcoin CC3 Testnet is SpaceFinance's AttestorRegistry -- always qualify by 'Robinhood Chain Mainnet, chainId 4663' when referencing."
+    },
+    "GapwatchRegistryV2": {
+      "address": "0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137",
+      "deployed_at_tx": "0xb5dcf25a55af98daf867002d828188b739ab0bb128759c83b5307d5dd822ebb2",
+      "deployed_at": "2026-09-15",
+      "constructor_args": {
+        "nodeSet": [
+          "0xEE8F1810De97636A1C73667231e0Ef23D5B36D44",
+          "0x88Ae2b3dfa72C216848d1A2f49c3aad016eDB9Cb",
+          "0x1002C167b6b677e01215F6042e4d29fEeF7224c0"
+        ],
+        "consensusVerifier": "0x6A7061D3f754BB594ed5092815Ae9bD71DD185b7",
+        "requiredBond": "500000000000000",
+        "challengeWindow": 86400
+      },
+      "note": "CREATE nonce collision: same address on Creditcoin CC3 Testnet is SpaceFinance's Outbox -- always qualify by 'Robinhood Chain Mainnet, chainId 4663' when referencing."
+    },
+    "MockLendingPool": {
+      "address": "0xd3256Ec6193cFD55D8E2028b9caCfABC11BA4E26",
+      "deployed_at_tx": "0xf4e314a57e2d13656b16315c45ce456fdcd5b9b8a64dd990357bb7f45e2ab549",
+      "deployed_at": "2026-09-15"
+    }
   }
 }
