@@ -12,7 +12,7 @@ Independent on-chain verification for Robinhood Chain corporate actions — watc
 
 ## 🌐 Live Demo
 
-https://frontend-flame-rho-ddm8ox3ai6.vercel.app
+https://gapwatch-app.vercel.app
 
 **Current mainnet contract:** GapwatchRegistryV2 `0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137` · Full deployment history, tx hashes, and constructor args: [deployment.json](./deployment.json)
 
