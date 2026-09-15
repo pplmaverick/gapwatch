@@ -18,10 +18,10 @@ Creditcoin CC3 Testnet）的合約地址**。這是同一個部署錢包在不�
 nonce 下產生的地址碰撞，屬已知現象（CREATE 地址只取決於部署者 + nonce，
 與鏈無關）。
 
-**本文件記錄僅適用於 Robinhood Chain Testnet（chain id 4663 對應的主網 /
-測試網環境）上的部署。任何引用這個地址時都必須明確標註鏈別
-（Robinhood Chain Testnet），不可與 SpaceFinance / Creditcoin CC3 的紀錄
-混用或混淆。**
+**本文件記錄的地址部署於 Robinhood Chain Testnet（chain id 46630），不適用於
+Robinhood Chain Mainnet（chain id 4663）。任何引用這個地址時都必須明確標註
+鏈別（Robinhood Chain Testnet, 46630），不可與 SpaceFinance / Creditcoin CC3
+的紀錄混用或混淆。**
 
 ---
 
