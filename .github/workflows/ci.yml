@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, ci-setup-test]
+  pull_request:
+    branches: [main]
+
+jobs:
+  solidity-tests:
+    name: Solidity (Foundry)
+    runs-on: ubuntu-latest
+    steps:
+      # `contracts/lib/` (forge-std, openzeppelin-contracts) is vendored as
+      # ordinary tracked files, not git submodules -- a plain checkout is
+      # enough and no `forge install` step is needed.
+      - uses: actions/checkout@v4
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: forge build
+        working-directory: contracts
+        run: forge build
+
+      - name: forge test
+        working-directory: contracts
+        run: forge test -vvv
+
+  rust-tests:
+    name: Rust / Stylus (cargo test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No toolchain action needed: `contracts-stylus/rust-toolchain.toml`
+      # pins channel 1.91.0 and declares the wasm32-unknown-unknown target,
+      # and the runner's pre-installed rustup honours that file automatically
+      # on the first cargo invocation. `cargo test` itself compiles for the
+      # host, so the wasm target is not strictly required here -- it is
+      # installed anyway because the toolchain file declares it.
+      - name: Show resolved toolchain
+        working-directory: contracts-stylus
+        run: rustup show active-toolchain
+
+      - name: cargo test
+        working-directory: contracts-stylus
+        run: cargo test --features test-utils
