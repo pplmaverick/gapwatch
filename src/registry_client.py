@@ -1,14 +1,21 @@
 """Shared web3.py wiring for talking to the on-chain contracts.
 
 Two separate chains are involved, which is a real quirk of this demo setup,
-not a bug: GapwatchRegistry and MockLendingPool are deployed on Robinhood
+not a bug: GapwatchRegistry (V1) and MockLendingPool are deployed on Robinhood
 Chain *Testnet* (cheap to iterate on), but the stock tokens they verify data
-about are real contracts on Robinhood Chain *Mainnet*. Anything that reads
+about are real contracts on Robinhood Chain *Mainnet*. Anything that reads V1's
 `verifications`/`latestVerificationForToken`/etc. must use the testnet RPC;
 anything that reads a token's own state (`balanceOfUI`, `uiMultiplier`) must
 use the mainnet RPC. Mixing them up produces a clean "contract not found"
 style failure, not silently wrong data, but it's worth being deliberate
 about which `w3` a given call uses.
+
+The Tier 3 `GapwatchRegistryV2` adds a third combination: it is on *mainnet*,
+alongside the tokens but separate from V1. `registry_v2_contract` is pinned
+there and does not follow `NETWORK`, because both registries have to be
+readable in the same process -- the testnet backfill event stays on display
+while V2 is still empty. `registry_contract` remains the `NETWORK`-selected
+path and still defaults to testnet V1, so nothing that reads it today moves.
 
 Contract addresses are never hardcoded here or anywhere else in the codebase
 -- they come from `deployment.json` at the project root, the one
@@ -37,7 +44,18 @@ NETWORK = os.environ.get("GAPWATCH_NETWORK", "testnet")
 
 _ABI_DIR = Path(__file__).resolve().parent / "abi"
 _REGISTRY_ABI = json.loads((_ABI_DIR / "GapwatchRegistry.json").read_text())
+_REGISTRY_V2_ABI = json.loads((_ABI_DIR / "GapwatchRegistryV2.json").read_text())
 _POOL_ABI = json.loads((_ABI_DIR / "MockLendingPool.json").read_text())
+
+#: `deployment.json` names the registry differently per network -- testnet
+#: carries V1 as `GapwatchRegistry`, mainnet carries Tier 3 as
+#: `GapwatchRegistryV2` -- so the key is resolved per network rather than
+#: assumed. Order matters: V1 first, so testnet keeps resolving exactly as it
+#: always has even if a `GapwatchRegistryV2` is ever added alongside it there.
+_REGISTRY_ABIS = {
+    "GapwatchRegistry": _REGISTRY_ABI,
+    "GapwatchRegistryV2": _REGISTRY_V2_ABI,
+}
 
 # Minimal ERC-8056 fragment -- only what the API needs, not a full token ABI.
 _BALANCE_OF_UI_ABI = [
@@ -72,8 +90,35 @@ _network_config = _deployment[NETWORK]
 TESTNET_RPC = _deployment["testnet"]["rpc_url"]
 MAINNET_RPC = _deployment["mainnet"]["rpc_url"]
 
-REGISTRY_ADDRESS = _network_config["GapwatchRegistry"]["address"]
+
+def _resolve_registry(network_config: dict[str, Any], network: str) -> tuple[str, str]:
+    """Pick the registry `deployment.json` actually records for `network`.
+
+    Returns `(deployment_key, address)`. Resolving the key rather than hardcoding
+    `"GapwatchRegistry"` is what stops `GAPWATCH_NETWORK=mainnet` from raising
+    KeyError at import time and taking the whole process down before it serves a
+    single request -- mainnet has never had a `GapwatchRegistry` entry.
+    """
+    for key in _REGISTRY_ABIS:
+        entry = network_config.get(key)
+        if entry is not None:
+            return key, entry["address"]
+    raise KeyError(
+        f"deployment.json network {network!r} has no registry entry "
+        f"(looked for {', '.join(_REGISTRY_ABIS)})"
+    )
+
+
+_REGISTRY_KEY, REGISTRY_ADDRESS = _resolve_registry(_network_config, NETWORK)
 POOL_ADDRESS = _network_config["MockLendingPool"]["address"]
+
+#: The Tier 3 registry is deployed only on mainnet, so its path is pinned there
+#: rather than following `NETWORK`. That is deliberate: the V1 and V2 paths must
+#: be usable *at the same time* -- the testnet NVDA backfill event stays
+#: readable for demo purposes while V2 is brought online -- so V2 cannot be
+#: expressed as "whichever network NETWORK happens to point at".
+V2_NETWORK = "mainnet"
+REGISTRY_V2_ADDRESS = _deployment[V2_NETWORK]["GapwatchRegistryV2"]["address"]
 
 
 def testnet_w3() -> Web3:
@@ -85,7 +130,26 @@ def mainnet_w3() -> Web3:
 
 
 def registry_contract(w3: Web3):
-    return w3.eth.contract(address=Web3.to_checksum_address(REGISTRY_ADDRESS), abi=_REGISTRY_ABI)
+    """The registry for whichever network `NETWORK` selects (default: testnet V1).
+
+    Pairs the address with the ABI matching the deployment key it resolved from,
+    so a mainnet selection gets the V2 ABI rather than V1's applied to a V2
+    address.
+    """
+    return w3.eth.contract(
+        address=Web3.to_checksum_address(REGISTRY_ADDRESS), abi=_REGISTRY_ABIS[_REGISTRY_KEY]
+    )
+
+
+def registry_v2_contract(w3: Web3):
+    """The Tier 3 `GapwatchRegistryV2` on mainnet, regardless of `NETWORK`.
+
+    Caller must pass a mainnet `w3` (see `mainnet_w3`); handing this a testnet
+    provider reads an address that holds no code there.
+    """
+    return w3.eth.contract(
+        address=Web3.to_checksum_address(REGISTRY_V2_ADDRESS), abi=_REGISTRY_V2_ABI
+    )
 
 
 def pool_contract(w3: Web3):

@@ -24,7 +24,13 @@ from requests.exceptions import RequestException
 from web3.exceptions import Web3Exception
 
 from src.event_store import DEFAULT_DB_PATH, STATUSES, connect, get_all_events, get_event_by_id
-from src.registry_client import event_hash_to_bytes32, mainnet_w3, registry_contract, testnet_w3
+from src.registry_client import (
+    event_hash_to_bytes32,
+    mainnet_w3,
+    registry_contract,
+    registry_v2_contract,
+    testnet_w3,
+)
 
 app = FastAPI(
     title="Gapwatch API",
@@ -83,8 +89,33 @@ def list_events(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=
     }
 
 
+#: Which registry a read is answered from. Both stay reachable on purpose:
+#: V1 on testnet still holds the NVDA backfill event the demo shows, while V2
+#: on mainnet is live but empty. `v1` is the default so every existing caller
+#: -- including the deployed frontend, which sends no such parameter -- keeps
+#: getting exactly the bytes it gets today.
+REGISTRY_SOURCES = ("v1", "v2")
+
+_REGISTRY_SOURCE_QUERY = Query(
+    "v1",
+    pattern="^(v1|v2)$",
+    description="v1 = GapwatchRegistry on testnet (default); v2 = GapwatchRegistryV2 on mainnet",
+)
+
+
+def _registry_for(source: str):
+    """Resolve a `registry=` value to a live contract handle.
+
+    Each branch pairs the contract with the chain it is actually deployed on;
+    there is no combination where the caller picks those independently.
+    """
+    if source == "v2":
+        return registry_v2_contract(mainnet_w3())
+    return registry_contract(testnet_w3())
+
+
 @app.get("/events/{event_id}")
-def get_event(event_id: int):
+def get_event(event_id: int, registry_source: str = _REGISTRY_SOURCE_QUERY):
     """One event's pipeline status, plus a live on-chain check -- never the cache."""
     conn = _db()
     row = get_event_by_id(conn, event_id)
@@ -95,13 +126,13 @@ def get_event(event_id: int):
     result["onchain"] = None
 
     try:
-        w3 = testnet_w3()
-        registry = registry_contract(w3)
+        registry = _registry_for(registry_source)
         event_hash = event_hash_to_bytes32(row["tx_hash"])
         verification = registry.functions.getVerification(event_hash).call()
         recorded_at = verification[5]
         if recorded_at != 0:
             result["onchain"] = {
+                "registry_version": registry_source,
                 "registry_address": registry.address,
                 "tx_hash_used_as_event_hash": row["tx_hash"],
                 "token": verification[0],
@@ -150,19 +181,21 @@ def get_token_balance(token_address: str, holder_address: str):
 
 
 @app.get("/tokens/{token_address}/verification-status")
-def get_token_verification_status(token_address: str):
+def get_token_verification_status(
+    token_address: str, registry_source: str = _REGISTRY_SOURCE_QUERY
+):
     """The core trust-minimized endpoint: reads GapwatchRegistry directly,
     nothing from SQLite. A caller does not have to trust this API's database --
     only the registry contract, whose address is public."""
     try:
-        w3 = testnet_w3()
-        registry = registry_contract(w3)
-        checksum_token = w3.to_checksum_address(token_address)
+        registry = _registry_for(registry_source)
+        checksum_token = registry.w3.to_checksum_address(token_address)
         event_hash = registry.functions.latestVerificationForToken(checksum_token).call()
 
         if event_hash == b"\x00" * 32:
             return {
                 "token": token_address,
+                "registry_version": registry_source,
                 "registry_address": registry.address,
                 "ever_verified": False,
                 "latest_event_hash": None,
@@ -176,6 +209,7 @@ def get_token_verification_status(token_address: str):
 
     return {
         "token": token_address,
+        "registry_version": registry_source,
         "registry_address": registry.address,
         "ever_verified": True,
         "latest_event_hash": "0x" + event_hash.hex(),
