@@ -2,21 +2,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import { NavBar } from "@/components/NavBar";
-import { FeedThroughput, Tick } from "@/components/FeedThroughput";
+import { FeedPoll, FeedWaveform } from "@/components/FeedWaveform";
 import { AuditLogTable } from "@/components/AuditLogTable";
 import { AuditEvent, getAuditLog } from "@/lib/api";
 import { downloadAuditLogCsv, downloadAuditLogJson } from "@/lib/download";
-import { KNOWN_TOKENS } from "@/lib/tokens";
+import { KNOWN_TOKENS, findKnownToken } from "@/lib/tokens";
 import { useConsensusConfirmations } from "@/lib/useConsensusConfirmations";
 
 const POLL_INTERVAL_MS = 5000;
+/** Enough polls to cover the waveform's 60s window with headroom. */
+const POLL_HISTORY = 24;
+
+function shortAddress(addr: string) {
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
 
 export default function AuditLogPage() {
   const [events, setEvents] = useState<AuditEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [ticks, setTicks] = useState<Tick[]>([]);
-  const lastCount = useRef<number | null>(null);
-  const tickId = useRef(0);
+  const [polls, setPolls] = useState<FeedPoll[]>([]);
+  /**
+   * Event ids already seen. `null` until the first response lands: everything
+   * in that first payload is pre-existing history, not something detected
+   * while the page was open, so it must not spike the waveform.
+   */
+  const seenIds = useRef<Set<number> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,11 +38,24 @@ export default function AuditLogPage() {
         setEvents(res.events);
         setError(null);
 
-        const detected =
-          lastCount.current !== null && res.count > lastCount.current;
-        lastCount.current = res.count;
-        tickId.current += 1;
-        setTicks((prev) => [...prev, { id: tickId.current, detected }].slice(-48));
+        // Diff by event id rather than by count: a count can stay level while
+        // rows change, and the id tells us which token to label the spike with.
+        const at = Date.now();
+        let detections: FeedPoll["detections"] = [];
+        if (seenIds.current === null) {
+          seenIds.current = new Set(res.events.map((e) => e.id));
+        } else {
+          const seen = seenIds.current;
+          detections = res.events
+            .filter((e) => !seen.has(e.id))
+            .map((e) => ({
+              eventId: e.id,
+              token: findKnownToken(e.token_address)?.symbol ?? shortAddress(e.token_address),
+              at,
+            }));
+          for (const e of res.events) seen.add(e.id);
+        }
+        setPolls((prev) => [...prev, { at, detections }].slice(-POLL_HISTORY));
       } catch {
         if (!cancelled) setError("Could not reach the Gapwatch API.");
       }
@@ -81,7 +104,7 @@ export default function AuditLogPage() {
               background: "rgba(11, 13, 17, 0.7)",
             }}
           >
-            <FeedThroughput ticks={ticks} />
+            <FeedWaveform polls={polls} />
           </div>
 
           <div className="mt-10 flex items-center justify-between gap-4">
