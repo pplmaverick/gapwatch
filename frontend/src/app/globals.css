@@ -57,3 +57,68 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* --- Pipeline diagram: travelling current pulse -----------------------------
+ * The band and the node glows are three separate animations that must stay
+ * phase-locked, so they all share one 3200ms cycle (2600ms of uniform travel
+ * + 600ms of rest at the end). The percentages below are that split:
+ *   81.25% = 2600/3200  -- band reaches the far end, then holds off-screen
+ *   21.875% = 700/3200  -- a node's glow decays back to its resting state
+ * PipelineDiagram.tsx owns the same numbers as TRAVEL_MS/PAUSE_MS/DECAY_MS
+ * and derives each node's animation-delay from them; change them together.
+ *
+ * The band is decorative: it illustrates the fixed four-stage pipeline, and is
+ * deliberately not bound to live polling state (unlike the audit log view).
+ */
+
+@keyframes gw-pulse-band {
+  0% {
+    transform: translateX(0);
+    animation-timing-function: linear;
+  }
+  81.25%,
+  100% {
+    transform: translateX(var(--gw-pulse-travel));
+  }
+}
+
+.gw-pulse-band {
+  animation: gw-pulse-band 3200ms linear infinite;
+}
+
+/* Keyframes outrank inline styles in the cascade, so these override the
+ * resting swatch each dot carries as a style prop, then hand it back. */
+@keyframes gw-pulse-node {
+  0% {
+    background-color: rgba(94, 234, 221, 0.9);
+    border-color: rgba(94, 234, 221, 0.9);
+    box-shadow: 0 0 10px 1px rgba(94, 234, 221, 0.45);
+  }
+  21.875%,
+  100% {
+    background-color: rgba(94, 234, 221, 0);
+    border-color: var(--foreground-dim);
+    box-shadow: 0 0 0 0 rgba(94, 234, 221, 0);
+  }
+}
+
+.gw-pulse-node {
+  animation: gw-pulse-node 3200ms linear infinite;
+}
+
+/* The final node rests green because green means "confirmed" everywhere else
+ * in this UI. Flashing it cyan would read as a state change rather than the
+ * pulse passing through, so it brightens in its own colour instead. */
+@keyframes gw-pulse-node-confirmed {
+  0% {
+    box-shadow: 0 0 20px 3px rgba(74, 222, 128, 0.5);
+  }
+  21.875%,
+  100% {
+    box-shadow: 0 0 14px 0 rgba(74, 222, 128, 0.14);
+  }
+}
+
+.gw-pulse-node-confirmed {
+  animation: gw-pulse-node-confirmed 3200ms linear infinite;
+}

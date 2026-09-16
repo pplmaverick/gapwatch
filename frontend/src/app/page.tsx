@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HeroTitle } from "@/components/HeroTitle";
 import { NavBar } from "@/components/NavBar";
 import { PipelineDiagram } from "@/components/PipelineDiagram";
 
@@ -19,11 +20,7 @@ export default function Home() {
             Independent verification layer &middot; Robinhood Chain
           </p>
 
-          <h1 className="flex flex-col text-[15vw] font-semibold leading-[0.95] tracking-[-0.04em] text-foreground sm:text-[9vw] md:text-[6.4rem]">
-            <span>Detected.</span>
-            <span>Verified.</span>
-            <span>Confirmed.</span>
-          </h1>
+          <HeroTitle className="flex flex-col text-[15vw] font-semibold leading-[0.95] tracking-[-0.04em] text-foreground sm:text-[9vw] md:text-[6.4rem]" />
 
           <p className="mt-8 max-w-md text-[15px] leading-relaxed text-foreground-muted">
             Gapwatch watches the Robinhood Chain sequencer feed, independently
