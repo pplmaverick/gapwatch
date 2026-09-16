@@ -57,6 +57,10 @@ export function TokenRow({ token, holderAddress, matchedEvents }: Props) {
 
   useEffect(() => {
     if (!holderAddress) {
+      // prop 變動觸發的資料抓取流程：沒有 holderAddress 就重置回 idle，有的話
+      // 在下方先設定 loading 狀態、緊接著發送非同步請求。兩者都是刻意的狀態
+      // 設定，不是規則要抓的可疑模式。
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 非可疑的 effect 內同步 setState 模式
       setBalance({ status: "idle" });
       return;
     }
