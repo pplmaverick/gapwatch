@@ -4,11 +4,16 @@ import { NavBar } from "@/components/NavBar";
 import { PipelineDiagram } from "@/components/PipelineDiagram";
 
 const SHIPPED = [
-  "Tier 1 — GapwatchRegistry deployed to Robinhood Chain Testnet",
-  "Tier 2 — challenge-bond mechanism live on-chain (testnet)",
-  "Tier 2.5 — MockLendingPool demo downstream consumer deployed (testnet)",
-  "Database + API layer (modules 6+7) reading the registry directly",
+  "Tier 1+2+2.5 — GapwatchRegistry, challenge bonds and the MockLendingPool consumer, live on Robinhood Chain Testnet and running unattended",
+  "Tier 3+4 — GapwatchRegistryV2 and the Stylus ConsensusVerifier deployed to Robinhood Chain Mainnet, with the first real 2-of-3 consensus confirmation now recorded on-chain",
+  "Database + API layer (modules 6+7) reading both registries directly",
 ];
+
+// Kept separate from SHIPPED: this is a design decision worth explaining, not
+// another checklist line, and burying it as one would be the easiest way to
+// let a reader assume the mainnet layer runs itself.
+const MANUAL_BY_DESIGN =
+  "Writing to the mainnet registry stays manual. Each record needs 2-of-3 node signatures, and automating that would mean putting all three node keys on the same server — collapsing the separation the 2-of-3 scheme exists to create. Detection is automatic; consensus confirmation is reviewed and signed deliberately.";
 
 export default function Home() {
   return (
@@ -67,16 +72,28 @@ export default function Home() {
               {SHIPPED.map((item) => (
                 <li
                   key={item}
-                  className="flex items-baseline gap-3 text-[14px] text-foreground-muted"
+                  className="flex items-baseline gap-3 text-[14px] leading-relaxed text-foreground-muted"
                 >
                   <span
-                    className="mt-[3px] h-[6px] w-[6px] shrink-0 rounded-full"
+                    className="mt-[6px] h-[6px] w-[6px] shrink-0 rounded-full"
                     style={{ background: "var(--semantic-confirmed)" }}
                   />
                   <span>{item}</span>
                 </li>
               ))}
             </ul>
+
+            <div
+              className="mt-8 rounded-xl border px-5 py-4"
+              style={{ borderColor: "var(--border-soft)" }}
+            >
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-interactive">
+                Manual by design
+              </p>
+              <p className="max-w-2xl text-[13px] leading-relaxed text-foreground-dim">
+                {MANUAL_BY_DESIGN}
+              </p>
+            </div>
           </div>
         </section>
       </main>

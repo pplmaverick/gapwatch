@@ -7,6 +7,7 @@ import { AuditLogTable } from "@/components/AuditLogTable";
 import { AuditEvent, getAuditLog } from "@/lib/api";
 import { downloadAuditLogCsv, downloadAuditLogJson } from "@/lib/download";
 import { KNOWN_TOKENS } from "@/lib/tokens";
+import { useConsensusConfirmations } from "@/lib/useConsensusConfirmations";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -44,6 +45,9 @@ export default function AuditLogPage() {
       clearInterval(id);
     };
   }, []);
+
+  // Additive layer: the table below renders from V1 regardless.
+  const confirmations = useConsensusConfirmations(events);
 
   const tokensWithHistory = new Set((events ?? []).map((e) => e.token_address.toLowerCase()));
   const tokensWithoutHistory = KNOWN_TOKENS.filter(
@@ -115,7 +119,10 @@ export default function AuditLogPage() {
             {events === null && !error ? (
               <p className="py-8 text-[13px] text-foreground-dim">Loading…</p>
             ) : (
-              <AuditLogTable events={[...(events ?? [])].sort((a, b) => b.id - a.id)} />
+              <AuditLogTable
+                events={[...(events ?? [])].sort((a, b) => b.id - a.id)}
+                confirmations={confirmations}
+              />
             )}
           </div>
 

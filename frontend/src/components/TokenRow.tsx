@@ -11,6 +11,8 @@ import {
 } from "@/lib/api";
 import { KnownToken } from "@/lib/tokens";
 import { backfillLabel } from "@/lib/knownBackfills";
+import { ConsensusBadge } from "./ConsensusBadge";
+import type { ConsensusConfirmation } from "@/lib/useConsensusConfirmations";
 
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -40,6 +42,8 @@ interface Props {
   token: KnownToken;
   holderAddress: string;
   matchedEvents: AuditEvent[];
+  /** Keyed by lowercased event tx hash; empty until the V2 lookup resolves. */
+  confirmations?: Map<string, ConsensusConfirmation>;
 }
 
 type BalanceState =
@@ -48,7 +52,12 @@ type BalanceState =
   | { status: "loaded"; value: number }
   | { status: "error"; message: string };
 
-export function TokenRow({ token, holderAddress, matchedEvents }: Props) {
+export function TokenRow({
+  token,
+  holderAddress,
+  matchedEvents,
+  confirmations,
+}: Props) {
   const [balance, setBalance] = useState<BalanceState>({ status: "idle" });
   const [expanded, setExpanded] = useState(false);
   const [details, setDetails] = useState<Record<number, EventDetail | "loading" | "error">>(
@@ -205,6 +214,15 @@ export function TokenRow({ token, holderAddress, matchedEvents }: Props) {
                           <p className="mt-1 text-[11px] italic text-foreground-dim">
                             {backfillLabel(event)}
                           </p>
+                        )}
+
+                        {confirmations?.has(event.tx_hash.toLowerCase()) && (
+                          <div className="mt-2">
+                            <ConsensusBadge
+                              eventTxHash={event.tx_hash}
+                              variant="detail"
+                            />
+                          </div>
                         )}
 
                         {detail === "loading" && (

@@ -3,6 +3,8 @@
 import { AuditEvent } from "@/lib/api";
 import { findKnownToken } from "@/lib/tokens";
 import { backfillLabel } from "@/lib/knownBackfills";
+import { ConsensusBadge } from "./ConsensusBadge";
+import type { ConsensusConfirmation } from "@/lib/useConsensusConfirmations";
 
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -43,7 +45,13 @@ function StatusBadge({ status }: { status: AuditEvent["status"] }) {
   );
 }
 
-export function AuditLogTable({ events }: { events: AuditEvent[] }) {
+interface Props {
+  events: AuditEvent[];
+  /** Keyed by lowercased event tx hash; empty until the V2 lookup resolves. */
+  confirmations?: Map<string, ConsensusConfirmation>;
+}
+
+export function AuditLogTable({ events, confirmations }: Props) {
   if (events.length === 0) {
     return (
       <p className="px-1 py-8 text-[13px] text-foreground-dim">
@@ -63,6 +71,7 @@ export function AuditLogTable({ events }: { events: AuditEvent[] }) {
             <th className="py-3 pr-4 font-medium">Block</th>
             <th className="py-3 pr-4 font-medium">Checks</th>
             <th className="py-3 pr-4 font-medium">Tx hash</th>
+            <th className="py-3 pr-4 font-medium">Consensus</th>
             <th className="py-3 pr-0 font-medium">Source</th>
           </tr>
         </thead>
@@ -70,6 +79,7 @@ export function AuditLogTable({ events }: { events: AuditEvent[] }) {
           {events.map((event) => {
             const token = findKnownToken(event.token_address);
             const backfillText = backfillLabel(event);
+            const confirmed = confirmations?.has(event.tx_hash.toLowerCase()) ?? false;
             return (
               <tr
                 key={event.id}
@@ -95,6 +105,13 @@ export function AuditLogTable({ events }: { events: AuditEvent[] }) {
                 </td>
                 <td className="py-3 pr-4 font-mono text-[12px] text-foreground-dim">
                   {shortAddress(event.tx_hash)}
+                </td>
+                <td className="py-3 pr-4">
+                  {confirmed ? (
+                    <ConsensusBadge eventTxHash={event.tx_hash} variant="compact" />
+                  ) : (
+                    <span className="text-[12px] text-foreground-dim">—</span>
+                  )}
                 </td>
                 <td className="py-3 pr-0 text-[11px] italic text-foreground-dim">
                   {backfillText ?? ""}

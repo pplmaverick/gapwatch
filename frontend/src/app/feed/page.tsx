@@ -5,6 +5,7 @@ import { AnimatePresence } from "motion/react";
 import { NavBar } from "@/components/NavBar";
 import { EventCard } from "@/components/EventCard";
 import { AuditEvent, getEvents } from "@/lib/api";
+import { useConsensusConfirmations } from "@/lib/useConsensusConfirmations";
 
 const POLL_INTERVAL_MS = 5000;
 const NON_TERMINAL: AuditEvent["status"][] = [
@@ -40,6 +41,9 @@ export default function FeedPage() {
       clearInterval(id);
     };
   }, []);
+
+  // Additive layer: V1 data above renders regardless of how this resolves.
+  const confirmations = useConsensusConfirmations(events);
 
   const sorted = events ? [...events].sort((a, b) => b.id - a.id) : [];
   const inProgress = sorted.find((e) => NON_TERMINAL.includes(e.status));
@@ -83,7 +87,12 @@ export default function FeedPage() {
             )}
             <AnimatePresence initial={false}>
               {sorted.map((event) => (
-                <EventCard key={event.id} event={event} focal={event.id === focalId} />
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  focal={event.id === focalId}
+                  consensusConfirmed={confirmations.has(event.tx_hash.toLowerCase())}
+                />
               ))}
             </AnimatePresence>
           </div>

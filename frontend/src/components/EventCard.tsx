@@ -5,6 +5,7 @@ import { AuditEvent } from "@/lib/api";
 import { findKnownToken } from "@/lib/tokens";
 import { backfillLabel } from "@/lib/knownBackfills";
 import { PipelineStatusBar } from "./PipelineStatusBar";
+import { ConsensusBadge } from "./ConsensusBadge";
 
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -13,9 +14,11 @@ function shortAddress(addr: string) {
 interface Props {
   event: AuditEvent;
   focal: boolean;
+  /** True once the mainnet consensus registry holds a record for this event. */
+  consensusConfirmed?: boolean;
 }
 
-export function EventCard({ event, focal }: Props) {
+export function EventCard({ event, focal, consensusConfirmed }: Props) {
   const token = findKnownToken(event.token_address);
   const backfillText = backfillLabel(event);
 
@@ -64,6 +67,15 @@ export function EventCard({ event, focal }: Props) {
           </span>
         )}
       </div>
+
+      {consensusConfirmed && (
+        <div className="mb-4">
+          <ConsensusBadge
+            eventTxHash={event.tx_hash}
+            variant={focal ? "detail" : "mark"}
+          />
+        </div>
+      )}
 
       {backfillText && (
         <p className="mb-4 text-[11px] italic leading-relaxed text-foreground-dim">

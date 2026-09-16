@@ -264,13 +264,16 @@ export function PipelineDiagram() {
           </motion.div>
         ))}
       </div>
-      <p className="mt-10 text-[12px] leading-relaxed text-foreground-dim">
+      <p className="mt-10 max-w-3xl text-[12px] leading-relaxed text-foreground-dim">
         Feed monitored: Robinhood Chain{" "}
-        <span className="text-foreground-muted">mainnet</span>. Verification
-        recorded: Robinhood Chain{" "}
-        <span className="text-foreground-muted">testnet</span> registry — the
-        monitoring target and the deployed verification contracts are on
-        different networks.
+        <span className="text-foreground-muted">mainnet</span>. The four stages
+        above run unattended and record to the{" "}
+        <span className="text-foreground-muted">testnet</span> registry (V1).
+        Confirmed events can then be promoted to the{" "}
+        <span className="text-foreground-muted">mainnet</span> consensus
+        registry (V2), which requires 2-of-3 node signatures and is written
+        manually rather than by this pipeline — so detection is continuous
+        while consensus confirmation is a deliberate step.
       </p>
     </div>
   );

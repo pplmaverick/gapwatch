@@ -6,6 +6,7 @@ import { AddressInput } from "@/components/AddressInput";
 import { TokenRow } from "@/components/TokenRow";
 import { AuditEvent, getAuditLog } from "@/lib/api";
 import { KNOWN_TOKENS } from "@/lib/tokens";
+import { useConsensusConfirmations } from "@/lib/useConsensusConfirmations";
 
 export default function BalancesPage() {
   const [holderAddress, setHolderAddress] = useState("");
@@ -16,6 +17,9 @@ export default function BalancesPage() {
       .then((res) => setAuditLog(res.events))
       .catch(() => setAuditLog([]));
   }, []);
+
+  // Additive layer: balances and history below come from V1 either way.
+  const confirmations = useConsensusConfirmations(auditLog);
 
   return (
     <>
@@ -55,6 +59,7 @@ export default function BalancesPage() {
                 matchedEvents={auditLog.filter(
                   (e) => e.token_address.toLowerCase() === token.address.toLowerCase()
                 )}
+                confirmations={confirmations}
               />
             ))}
           </div>

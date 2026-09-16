@@ -78,7 +78,11 @@ export function getEvents(limit = 50, offset = 0) {
   return getJson<EventsListResponse>(`/events?limit=${limit}&offset=${offset}`);
 }
 
+/** Which registry answers a read. See RegistrySource in the backend's api.py. */
+export type RegistrySource = "v1" | "v2";
+
 export interface OnchainVerification {
+  registry_version: RegistrySource;
   registry_address: string;
   tx_hash_used_as_event_hash: string;
   token: string;
@@ -101,6 +105,7 @@ export function getEventDetail(eventId: number) {
 
 export interface VerificationStatus {
   token: string;
+  registry_version: RegistrySource;
   registry_address: string;
   ever_verified: boolean;
   latest_event_hash: string | null;
@@ -111,8 +116,18 @@ export interface VerificationStatus {
   recorded_at?: number;
 }
 
-export function getTokenVerificationStatus(tokenAddress: string) {
+/**
+ * Omitting `registrySource` keeps the backend's own default (v1, the testnet
+ * registry), so this stays the plain live-detection read every screen already
+ * relies on. Pass "v2" only to ask the separate mainnet consensus registry
+ * whether it has confirmed the token's latest event.
+ */
+export function getTokenVerificationStatus(
+  tokenAddress: string,
+  registrySource?: RegistrySource
+) {
+  const qs = registrySource ? `?registry_source=${registrySource}` : "";
   return getJson<VerificationStatus>(
-    `/tokens/${tokenAddress}/verification-status`
+    `/tokens/${tokenAddress}/verification-status${qs}`
   );
 }
