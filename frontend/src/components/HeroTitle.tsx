@@ -24,6 +24,15 @@ let hasPlayedThisSession = false;
 
 type Entrance = "spring" | "crossfade" | "instant";
 
+/**
+ * How long one line takes to visually arrive (Apple's "response"), and the gap
+ * between consecutive lines. Deliberately unhurried: the point of the reveal is
+ * that a reader notices the three words land in order, which a faster spring
+ * runs past. These two are the knobs to turn when retuning the feel.
+ */
+const LINE_RESPONSE_S = 0.8;
+const LINE_STAGGER_S = 0.22;
+
 function resolveEntrance(): Entrance {
   // SSR has no media query to read and no session history; it emits the
   // hidden `initial` state either way, so the choice here only has to be
@@ -73,7 +82,9 @@ function transitionFor(entrance: Entrance, i: number) {
     // Reduced motion still gets the staggered reveal, but as a pure opacity
     // cross-fade: `y` is snapped to its target so no vestibular translation
     // happens, while the sequencing that makes the three lines read in order
-    // is preserved.
+    // is preserved. Deliberately NOT slowed to match the spring above --
+    // someone asking for reduced motion wants less of it, not a longer
+    // version of it.
     case "crossfade":
       return {
         opacity: { duration: 0.24, ease: "easeOut" as const, delay: i * 0.05 },
@@ -81,15 +92,16 @@ function transitionFor(entrance: Entrance, i: number) {
       };
 
     // Critically damped (bounce 0) -- nothing here carried momentum from a
-    // gesture, so overshoot would be decoration rather than physics.
-    // visualDuration is Apple's "response": how long a line takes to visually
-    // arrive. 0.24s of stagger + 0.5s response lands the last line at ~0.74s.
+    // gesture, so overshoot would be decoration rather than physics. The last
+    // line starts at 2 x LINE_STAGGER_S and takes LINE_RESPONSE_S to arrive,
+    // so the reveal now runs past a second: slower than the original brief
+    // asked for, which is the change being made here, not an oversight.
     case "spring":
       return {
         type: "spring" as const,
         bounce: 0,
-        visualDuration: 0.5,
-        delay: i * 0.12,
+        visualDuration: LINE_RESPONSE_S,
+        delay: i * LINE_STAGGER_S,
       };
   }
 }
