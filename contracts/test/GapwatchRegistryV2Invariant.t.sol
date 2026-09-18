@@ -11,6 +11,10 @@ import {ConsensusVerifierMock} from "../src/ConsensusVerifierMock.sol";
 ///         real 2-of-3 quorum, so the fuzzer explores the *state machine*
 ///         rather than bouncing off signature checks.
 contract RegistryHandler is Test {
+    address constant FILTER_PRECOMPILE = 0x0000000000000000000000000000000000000074;
+    bytes4 constant IS_FILTERED_SELECTOR = 0x85c733a4;
+    bytes4 constant UI_MULTIPLIER_SELECTOR = 0xa60bf13d;
+
     GapwatchRegistryV2 public registry;
 
     uint256 internal node1Pk;
@@ -78,13 +82,22 @@ contract RegistryHandler is Test {
         address actor = _actor(seed);
 
         bytes32 digest = keccak256(
-            abi.encode(eventHash, token, uint256(1e18), uint256(2e18), false, bytes32(0), address(registry), block.chainid)
+            abi.encode(
+                eventHash, token, uint256(1e18), uint256(2e18), false, uint256(2e18), bytes32(0), address(registry), block.chainid
+            )
         );
         bytes[] memory sigs = _quorum(digest, seed);
 
+        // Stub the two staticcalls recordVerification now makes -- "not
+        // filtered, uiMultiplier() == 2e18", matching the claimed values
+        // below, so the fuzzer keeps exploring the same state machine it did
+        // before the cross-validation upgrade rather than bouncing off it.
+        vm.mockCall(FILTER_PRECOMPILE, abi.encodeWithSelector(IS_FILTERED_SELECTOR, eventHash), abi.encode(false));
+        vm.mockCall(token, abi.encodeWithSelector(UI_MULTIPLIER_SELECTOR), abi.encode(uint256(2e18)));
+
         vm.deal(actor, actor.balance + bond);
         vm.prank(actor);
-        try registry.recordVerification{value: bond}(eventHash, token, 1e18, 2e18, false, bytes32(0), sigs) {
+        try registry.recordVerification{value: bond}(eventHash, token, false, 2e18, 1e18, 2e18, bytes32(0), sigs) {
             eventHashes.push(eventHash);
             tokenOf[eventHash] = token;
             ghost_deposited += bond;

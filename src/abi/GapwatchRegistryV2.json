@@ -40,6 +40,32 @@
   },
   {
     "type": "function",
+    "name": "FILTER_PRECOMPILE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "IS_FILTERED_SELECTOR",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_CHALLENGE_WINDOW",
     "inputs": [],
     "outputs": [
@@ -60,6 +86,19 @@
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "UI_MULTIPLIER_SELECTOR",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes4",
+        "internalType": "bytes4"
       }
     ],
     "stateMutability": "view"
@@ -388,14 +427,24 @@
     "name": "recordVerification",
     "inputs": [
       {
-        "name": "eventHash",
+        "name": "txHash",
         "type": "bytes32",
         "internalType": "bytes32"
       },
       {
-        "name": "token",
+        "name": "tokenAddress",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "claimedFiltered",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "claimedMultiplier",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
         "name": "oldMultiplier",
@@ -406,11 +455,6 @@
         "name": "newMultiplier",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "wasFiltered",
-        "type": "bool",
-        "internalType": "bool"
       },
       {
         "name": "referenceModelHash",
@@ -846,6 +890,27 @@
   },
   {
     "type": "error",
+    "name": "FilterCheckMismatch",
+    "inputs": [
+      {
+        "name": "txHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "claimedFiltered",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "actualFiltered",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InsufficientBond",
     "inputs": [
       {
@@ -862,8 +927,40 @@
   },
   {
     "type": "error",
+    "name": "MultiplierMismatch",
+    "inputs": [
+      {
+        "name": "tokenAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "claimedMultiplier",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actualMultiplier",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "NoActiveChallenge",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotERC8056Token",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",

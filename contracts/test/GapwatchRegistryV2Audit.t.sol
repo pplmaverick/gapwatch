@@ -11,6 +11,10 @@ import {ConsensusVerifierMock} from "../src/ConsensusVerifierMock.sol";
 ///         Uses ConsensusVerifierMock as the IConsensusVerifier (forge cannot
 ///         execute the Stylus/WASM production verifier).
 contract GapwatchRegistryV2AuditTest is Test {
+    address constant FILTER_PRECOMPILE = 0x0000000000000000000000000000000000000074;
+    bytes4 constant IS_FILTERED_SELECTOR = 0x85c733a4;
+    bytes4 constant UI_MULTIPLIER_SELECTOR = 0xa60bf13d;
+
     GapwatchRegistryV2 registry;
     ConsensusVerifierMock verifier;
 
@@ -58,9 +62,16 @@ contract GapwatchRegistryV2AuditTest is Test {
         arr[1] = b;
     }
 
+    /// @dev `claimedFiltered=false`/`claimedMultiplier=2e18` -- matches
+    ///      `_record`'s mocked "actual" values below (`newMultiplier` was
+    ///      already 2e18 everywhere in this file), so existing test intent
+    ///      (unfiltered, ends at 2e18) is unchanged by the cross-validation
+    ///      upgrade.
     function _recordDigest(bytes32 eventHash) internal view returns (bytes32) {
         return keccak256(
-            abi.encode(eventHash, token, uint256(1e18), uint256(2e18), false, bytes32(0), address(registry), block.chainid)
+            abi.encode(
+                eventHash, token, uint256(1e18), uint256(2e18), false, uint256(2e18), bytes32(0), address(registry), block.chainid
+            )
         );
     }
 
@@ -68,11 +79,20 @@ contract GapwatchRegistryV2AuditTest is Test {
         return keccak256(abi.encode(eventHash, outcome, address(registry), block.chainid));
     }
 
+    /// @dev Stubs the two staticcalls `recordVerification` now makes.
+    function _mockActualState(bytes32 eventHash) internal {
+        vm.mockCall(
+            FILTER_PRECOMPILE, abi.encodeWithSelector(IS_FILTERED_SELECTOR, eventHash), abi.encode(false)
+        );
+        vm.mockCall(token, abi.encodeWithSelector(UI_MULTIPLIER_SELECTOR), abi.encode(uint256(2e18)));
+    }
+
     function _record(bytes32 eventHash) internal {
+        _mockActualState(eventHash);
         bytes32 d = _recordDigest(eventHash);
         bytes[] memory sigs = _pair(_sign(node1Pk, d), _sign(node2Pk, d));
         vm.prank(recorder);
-        registry.recordVerification{value: BOND}(eventHash, token, 1e18, 2e18, false, bytes32(0), sigs);
+        registry.recordVerification{value: BOND}(eventHash, token, false, 2e18, 1e18, 2e18, bytes32(0), sigs);
     }
 
     // ------------------------------------------------------------------ //

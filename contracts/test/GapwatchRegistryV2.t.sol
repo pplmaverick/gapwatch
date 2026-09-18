@@ -14,6 +14,10 @@ import {ConsensusVerifierMock} from "../src/ConsensusVerifierMock.sol";
 ///         (msgHash binding, threshold gating, revert-vs-skip handling of the
 ///         verifier's result) -- it is not a test of the Rust contract itself.
 contract GapwatchRegistryV2Test is Test {
+    address constant FILTER_PRECOMPILE = 0x0000000000000000000000000000000000000074;
+    bytes4 constant IS_FILTERED_SELECTOR = 0x85c733a4;
+    bytes4 constant UI_MULTIPLIER_SELECTOR = 0xa60bf13d;
+
     GapwatchRegistryV2 registry;
     ConsensusVerifierMock verifier;
 
@@ -67,8 +71,29 @@ contract GapwatchRegistryV2Test is Test {
         return abi.encodePacked(r, s, v);
     }
 
+    /// @dev `claimedFiltered=false`/`claimedMultiplier=1e18` throughout this
+    ///      file's happy-path helpers -- matches `_record`'s mocked "actual"
+    ///      values below, so every existing call site's intended behavior
+    ///      (unfiltered, 1e18 multiplier) is preserved after the filter-check
+    ///      + multiplier cross-validation upgrade, not changed.
     function _recordMsgHash(bytes32 eventHash, address registryAddr) internal view returns (bytes32) {
-        return keccak256(abi.encode(eventHash, token, uint256(1e18), uint256(1e18), false, bytes32(0), registryAddr, block.chainid));
+        return keccak256(
+            abi.encode(
+                eventHash, token, uint256(1e18), uint256(1e18), false, uint256(1e18), bytes32(0), registryAddr, block.chainid
+            )
+        );
+    }
+
+    /// @dev Stubs the two staticcalls `recordVerification` now makes, so
+    ///      `token` (a plain `makeAddr()` address with no code) and an
+    ///      arbitrary `eventHash` behave as "not filtered, uiMultiplier() ==
+    ///      1e18" -- the same values every existing test in this file was
+    ///      already implicitly assuming before the cross-validation upgrade.
+    function _mockActualState(bytes32 eventHash) internal {
+        vm.mockCall(
+            FILTER_PRECOMPILE, abi.encodeWithSelector(IS_FILTERED_SELECTOR, eventHash), abi.encode(false)
+        );
+        vm.mockCall(token, abi.encodeWithSelector(UI_MULTIPLIER_SELECTOR), abi.encode(uint256(1e18)));
     }
 
     function _challengeMsgHash(bytes32 eventHash, bool outcome, address registryAddr) internal view returns (bytes32) {
@@ -97,8 +122,9 @@ contract GapwatchRegistryV2Test is Test {
     }
 
     function _record(bytes32 eventHash, bytes[] memory signatures) internal {
+        _mockActualState(eventHash);
         vm.prank(recorder);
-        registry.recordVerification{value: BOND}(eventHash, token, 1e18, 1e18, false, bytes32(0), signatures);
+        registry.recordVerification{value: BOND}(eventHash, token, false, 1e18, 1e18, 1e18, bytes32(0), signatures);
     }
 
     /// @dev Signs the canonical recordVerification digest for `eventHash`
@@ -163,9 +189,10 @@ contract GapwatchRegistryV2Test is Test {
         // the digest recomputed inside recordVerification for EVENT_HASH_2 does not
         // match what was actually signed, so ecrecover yields the wrong (or a
         // random) address and consensus is not reached.
+        _mockActualState(EVENT_HASH_2);
         vm.prank(recorder);
         vm.expectRevert(); // ConsensusNotReached, with an unpredictable validCount
-        registry.recordVerification{value: BOND}(EVENT_HASH_2, token, 1e18, 1e18, false, bytes32(0), sigsForEvent1);
+        registry.recordVerification{value: BOND}(EVENT_HASH_2, token, false, 1e18, 1e18, 1e18, bytes32(0), sigsForEvent1);
         assertFalse(registry.isVerified(EVENT_HASH_2));
     }
 
@@ -177,10 +204,11 @@ contract GapwatchRegistryV2Test is Test {
 
         bytes[] memory sigsForRegistry = _node1and2Sigs(EVENT_HASH, address(registry));
 
+        _mockActualState(EVENT_HASH);
         vm.deal(recorder, 10 ether);
         vm.prank(recorder);
         vm.expectRevert(abi.encodeWithSelector(GapwatchRegistryV2.ConsensusNotReached.selector, 0, 2));
-        registryB.recordVerification{value: BOND}(EVENT_HASH, token, 1e18, 1e18, false, bytes32(0), sigsForRegistry);
+        registryB.recordVerification{value: BOND}(EVENT_HASH, token, false, 1e18, 1e18, 1e18, bytes32(0), sigsForRegistry);
         assertFalse(registryB.isVerified(EVENT_HASH));
     }
 

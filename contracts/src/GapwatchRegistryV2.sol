@@ -151,6 +151,24 @@ contract GapwatchRegistryV2 is Ownable, ReentrancyGuard {
     error ChallengeWindowTooLong(uint256 requested, uint256 max);
     /// @notice `verifyConsensus` reported `validCount < CONSENSUS_THRESHOLD`.
     error ConsensusNotReached(uint256 validCount, uint256 threshold);
+    /// @notice `tokenAddress.staticcall(uiMultiplier())` did not come back
+    ///         with a clean 32-byte return -- either it reverted, or it has
+    ///         no code / isn't ERC-8056-shaped at that selector.
+    error NotERC8056Token(address token);
+    /// @notice The relayer's `claimedFiltered` does not match what
+    ///         `isTransactionFiltered(txHash)` reports on-chain right now.
+    error FilterCheckMismatch(bytes32 txHash, bool claimedFiltered, bool actualFiltered);
+    /// @notice The relayer's `claimedMultiplier` does not match
+    ///         `tokenAddress.uiMultiplier()`'s current on-chain value.
+    error MultiplierMismatch(address tokenAddress, uint256 claimedMultiplier, uint256 actualMultiplier);
+
+    /// @notice ArbOS's ArbFilteredTransactionsManager precompile, and the
+    ///         ERC-8056 `uiMultiplier()` selector. Verified against live RPC
+    ///         (see docs/recordVerification-checklist.md and the audit
+    ///         history for this cross-validation logic).
+    address public constant FILTER_PRECOMPILE = 0x0000000000000000000000000000000000000074;
+    bytes4 public constant IS_FILTERED_SELECTOR = 0x85c733a4;
+    bytes4 public constant UI_MULTIPLIER_SELECTOR = 0xa60bf13d;
 
     /// @dev `owner` (and `transferOwnership()` / `renounceOwnership()`) come from
     ///      OpenZeppelin's Ownable, deployer set as the initial owner. Owner
@@ -189,49 +207,109 @@ contract GapwatchRegistryV2 is Ownable, ReentrancyGuard {
         return [node1, node2, node3];
     }
 
+    /// @dev Packs the two on-chain-read "actual" values so `recordVerification`
+    ///      only needs one local for them (avoids "stack too deep" without
+    ///      `--via-ir`, which this project does not build with).
+    struct ActualState {
+        bool filtered;
+        uint256 multiplier;
+    }
+
+    /// @dev Split into two functions (filter-only, then multiplier-only) so
+    ///      `recordVerification` can revert on the filter mismatch BEFORE
+    ///      ever touching `tokenAddress` -- filter-check runs first, always.
+    function _readActualStateFilterOnly(bytes32 txHash) internal returns (ActualState memory s) {
+        (bool okFilter, bytes memory retFilter) =
+            FILTER_PRECOMPILE.staticcall(abi.encodeWithSelector(IS_FILTERED_SELECTOR, txHash));
+        require(okFilter && retFilter.length == 32, "FilterPrecompileCallFailed");
+        s.filtered = abi.decode(retFilter, (bool));
+    }
+
+    /// @dev See `_readActualStateFilterOnly`.
+    function _readActualMultiplier(address tokenAddress) internal returns (uint256 multiplier) {
+        (bool okMult, bytes memory retMult) = tokenAddress.staticcall(abi.encodeWithSelector(UI_MULTIPLIER_SELECTOR));
+        if (!okMult || retMult.length != 32) revert NotERC8056Token(tokenAddress);
+        multiplier = abi.decode(retMult, (uint256));
+    }
+
     /// @notice Record one verified event, posting `msg.value` as its bond, gated
     ///         by 2-of-3 node consensus instead of V1's single relayer. Reverts
     ///         if `eventHash` was already recorded -- records are immutable once
     ///         written by design: this is the core trust guarantee of the registry.
+    ///         Also cross-validates the relayer's claims against what the chain
+    ///         itself reports RIGHT NOW: `claimedFiltered` against
+    ///         `isTransactionFiltered(txHash)` on the ArbOS precompile (checked
+    ///         first), then `claimedMultiplier` against `tokenAddress.uiMultiplier()`
+    ///         (checked second) -- a mismatch on either reverts
+    ///         (`FilterCheckMismatch`/`MultiplierMismatch`) before any state is
+    ///         touched, and what gets written to `verifications[txHash]` is the
+    ///         on-chain `actual*` values this function itself just read, never
+    ///         the relayer-submitted `claimed*` ones. See
+    ///         docs/recordVerification-checklist.md for the operational
+    ///         implication: claimed values must be freshly re-queried
+    ///         immediately before submission, not reused from an earlier
+    ///         off-chain snapshot.
     /// @param signatures 2-of-3 ECDSA signatures (order does not matter, extra
     ///        signatures beyond 3 are wasted gas but not an error) over
-    ///        `keccak256(abi.encode(eventHash, token, oldMultiplier, newMultiplier,
-    ///        wasFiltered, referenceModelHash, address(this), block.chainid))`.
+    ///        `keccak256(abi.encode(txHash, tokenAddress, oldMultiplier, newMultiplier,
+    ///        claimedFiltered, claimedMultiplier, referenceModelHash, address(this),
+    ///        block.chainid))`.
     function recordVerification(
-        bytes32 eventHash,
-        address token,
+        bytes32 txHash,
+        address tokenAddress,
+        bool claimedFiltered,
+        uint256 claimedMultiplier,
         uint256 oldMultiplier,
         uint256 newMultiplier,
-        bool wasFiltered,
         bytes32 referenceModelHash,
         bytes[] calldata signatures
     ) external payable {
-        if (token == address(0)) revert ZeroAddress();
-        if (verifications[eventHash].recordedAt != 0) revert AlreadyRecorded(eventHash);
+        // --- filter-check: claimed vs actual, checked first --------------- //
+        ActualState memory actual = _readActualStateFilterOnly(txHash);
+        if (actual.filtered != claimedFiltered) {
+            revert FilterCheckMismatch(txHash, claimedFiltered, actual.filtered);
+        }
+
+        // --- multiplier cross-check: claimed vs actual --------------------- //
+        actual.multiplier = _readActualMultiplier(tokenAddress);
+        if (actual.multiplier != claimedMultiplier) {
+            revert MultiplierMismatch(tokenAddress, claimedMultiplier, actual.multiplier);
+        }
+
+        if (tokenAddress == address(0)) revert ZeroAddress();
+        if (verifications[txHash].recordedAt != 0) revert AlreadyRecorded(txHash);
         if (msg.value < requiredBond) revert InsufficientBond(requiredBond, msg.value);
 
         bytes32 msgHash = keccak256(
             abi.encode(
-                eventHash, token, oldMultiplier, newMultiplier, wasFiltered, referenceModelHash, address(this), block.chainid
+                txHash,
+                tokenAddress,
+                oldMultiplier,
+                newMultiplier,
+                claimedFiltered,
+                claimedMultiplier,
+                referenceModelHash,
+                address(this),
+                block.chainid
             )
         );
         (bool passed, uint256 validCount,) =
             IConsensusVerifier(consensusVerifier).verifyConsensus(msgHash, signatures, nodeSet(), CONSENSUS_THRESHOLD);
         if (!passed) revert ConsensusNotReached(validCount, CONSENSUS_THRESHOLD);
 
-        verifications[eventHash] = Verification({
-            token: token,
+        verifications[txHash] = Verification({
+            token: tokenAddress,
             oldMultiplier: oldMultiplier,
-            newMultiplier: newMultiplier,
-            wasFiltered: wasFiltered,
+            newMultiplier: actual.multiplier,
+            wasFiltered: actual.filtered,
             referenceModelHash: referenceModelHash,
             recordedAt: block.timestamp,
             bond: msg.value,
             recordedBy: msg.sender
         });
-        latestVerificationForToken[token] = eventHash;
+        latestVerificationForToken[tokenAddress] = txHash;
 
-        emit VerificationRecorded(eventHash, token, wasFiltered);
+        emit VerificationRecorded(txHash, tokenAddress, actual.filtered);
     }
 
     /// @notice Flag a recorded event as disputed -- e.g. the off-chain Reference

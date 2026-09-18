@@ -26,7 +26,11 @@ contract ReentrantWithdrawerV2 {
         bytes[] calldata signatures,
         uint256 bond
     ) external {
-        registry.recordVerification{value: bond}(eventHash, token, 1e18, 2e18, false, bytes32(0), signatures);
+        // Caller (the test) is expected to have already set up vm.mockCall
+        // for FILTER_PRECOMPILE/token before invoking this -- mocks are
+        // matched by target address + calldata, not by caller, so that works
+        // regardless of which contract actually makes the call.
+        registry.recordVerification{value: bond}(eventHash, token, false, 2e18, 1e18, 2e18, bytes32(0), signatures);
     }
 
     function attack() external {
@@ -46,6 +50,10 @@ contract ReentrantWithdrawerV2 {
 }
 
 contract GapwatchRegistryV2Audit2Test is Test {
+    address constant FILTER_PRECOMPILE = 0x0000000000000000000000000000000000000074;
+    bytes4 constant IS_FILTERED_SELECTOR = 0x85c733a4;
+    bytes4 constant UI_MULTIPLIER_SELECTOR = 0xa60bf13d;
+
     GapwatchRegistryV2 registry;
     ConsensusVerifierMock verifier;
     MockLendingPool pool;
@@ -98,7 +106,9 @@ contract GapwatchRegistryV2Audit2Test is Test {
 
     function _recordDigest(bytes32 eventHash, address tok, uint256 chainId) internal view returns (bytes32) {
         return keccak256(
-            abi.encode(eventHash, tok, uint256(1e18), uint256(2e18), false, bytes32(0), address(registry), chainId)
+            abi.encode(
+                eventHash, tok, uint256(1e18), uint256(2e18), false, uint256(2e18), bytes32(0), address(registry), chainId
+            )
         );
     }
 
@@ -107,9 +117,20 @@ contract GapwatchRegistryV2Audit2Test is Test {
         return _pair(_sign(node1Pk, d), _sign(node2Pk, d));
     }
 
+    /// @dev Stubs the two staticcalls `recordVerification` now makes for
+    ///      `tok`/`eventHash`, at "not filtered, uiMultiplier() == 2e18" --
+    ///      matches this file's existing `newMultiplier=2e18` everywhere.
+    function _mockActualState(bytes32 eventHash, address tok) internal {
+        vm.mockCall(
+            FILTER_PRECOMPILE, abi.encodeWithSelector(IS_FILTERED_SELECTOR, eventHash), abi.encode(false)
+        );
+        vm.mockCall(tok, abi.encodeWithSelector(UI_MULTIPLIER_SELECTOR), abi.encode(uint256(2e18)));
+    }
+
     function _record(bytes32 eventHash, address tok) internal {
+        _mockActualState(eventHash, tok);
         vm.prank(recorder);
-        registry.recordVerification{value: BOND}(eventHash, tok, 1e18, 2e18, false, bytes32(0), _recordSigs(eventHash, tok));
+        registry.recordVerification{value: BOND}(eventHash, tok, false, 2e18, 1e18, 2e18, bytes32(0), _recordSigs(eventHash, tok));
     }
 
     function _discrepancySigs(bytes32 eventHash, string memory reason) internal view returns (bytes[] memory) {
@@ -225,6 +246,7 @@ contract GapwatchRegistryV2Audit2Test is Test {
         vm.deal(address(attacker), 10 ether);
 
         bytes32 evt = keccak256("r2-reentrancy");
+        _mockActualState(evt, token);
         attacker.record(evt, token, _recordSigs(evt, token), BOND);
 
         // Window passes with no challenge; the attacker's bond is credited.
@@ -384,9 +406,10 @@ contract GapwatchRegistryV2Audit2Test is Test {
         uint256 forkChainId = block.chainid + 12345;
         vm.chainId(forkChainId);
 
+        _mockActualState(EVENT_HASH, token);
         vm.prank(recorder);
         vm.expectRevert(abi.encodeWithSelector(GapwatchRegistryV2.ConsensusNotReached.selector, 0, 2));
-        registry.recordVerification{value: BOND}(EVENT_HASH, token, 1e18, 2e18, false, bytes32(0), sigs);
+        registry.recordVerification{value: BOND}(EVENT_HASH, token, false, 2e18, 1e18, 2e18, bytes32(0), sigs);
         assertFalse(registry.isVerified(EVENT_HASH));
     }
 
@@ -397,9 +420,10 @@ contract GapwatchRegistryV2Audit2Test is Test {
         bytes32 foreignDigest = _recordDigest(EVENT_HASH, token, fakeChainId);
         bytes[] memory sigs = _pair(_sign(node1Pk, foreignDigest), _sign(node2Pk, foreignDigest));
 
+        _mockActualState(EVENT_HASH, token);
         vm.prank(recorder);
         vm.expectRevert(abi.encodeWithSelector(GapwatchRegistryV2.ConsensusNotReached.selector, 0, 2));
-        registry.recordVerification{value: BOND}(EVENT_HASH, token, 1e18, 2e18, false, bytes32(0), sigs);
+        registry.recordVerification{value: BOND}(EVENT_HASH, token, false, 2e18, 1e18, 2e18, bytes32(0), sigs);
         assertFalse(registry.isVerified(EVENT_HASH));
     }
 
@@ -427,8 +451,9 @@ contract GapwatchRegistryV2Audit2Test is Test {
         registry.setRequiredBond(1 ether);
 
         bytes32 evt = keccak256("r2-bond-retro");
+        _mockActualState(evt, token);
         vm.prank(recorder);
-        registry.recordVerification{value: 1 ether}(evt, token, 1e18, 2e18, false, bytes32(0), _recordSigs(evt, token));
+        registry.recordVerification{value: 1 ether}(evt, token, false, 2e18, 1e18, 2e18, bytes32(0), _recordSigs(evt, token));
         assertEq(registry.getVerification(evt).bond, 1 ether);
 
         // Owner raises the global minimum fivefold AFTER the fact.
@@ -454,8 +479,9 @@ contract GapwatchRegistryV2Audit2Test is Test {
         registry.setRequiredBond(1 ether);
 
         bytes32 evt = keccak256("r2-bond-retro-2");
+        _mockActualState(evt, token);
         vm.prank(recorder);
-        registry.recordVerification{value: 1 ether}(evt, token, 1e18, 2e18, false, bytes32(0), _recordSigs(evt, token));
+        registry.recordVerification{value: 1 ether}(evt, token, false, 2e18, 1e18, 2e18, bytes32(0), _recordSigs(evt, token));
 
         registry.setRequiredBond(0.0001 ether);
 
@@ -474,8 +500,9 @@ contract GapwatchRegistryV2Audit2Test is Test {
     /// is what a challenger must match.
     function test_requiredBond_overpaymentBecomesTheBarForChallengers() public {
         bytes32 evt = keccak256("r2-bond-overpay");
+        _mockActualState(evt, token);
         vm.prank(recorder);
-        registry.recordVerification{value: 3 ether}(evt, token, 1e18, 2e18, false, bytes32(0), _recordSigs(evt, token));
+        registry.recordVerification{value: 3 ether}(evt, token, false, 2e18, 1e18, 2e18, bytes32(0), _recordSigs(evt, token));
         assertEq(registry.getVerification(evt).bond, 3 ether);
 
         vm.prank(challenger);

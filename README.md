@@ -236,13 +236,19 @@ docker compose up --build
 **GapwatchRegistryV2** (Solidity 0.8.30)
 
 ```solidity
-// consensus-gated (2-of-3 signatures required)
+// consensus-gated (2-of-3 signatures required), AND cross-validated against
+// live on-chain state: claimedFiltered/claimedMultiplier must match
+// isTransactionFiltered(txHash) / tokenAddress.uiMultiplier() at the moment
+// this transaction executes, or it reverts (FilterCheckMismatch /
+// NotERC8056Token / MultiplierMismatch) before any state is touched. See
+// Honest Disclosures #14 and docs/recordVerification-checklist.md.
 function recordVerification(
-    bytes32 eventHash,
-    address token,
+    bytes32 txHash,
+    address tokenAddress,
+    bool claimedFiltered,
+    uint256 claimedMultiplier,
     uint256 oldMultiplier,
     uint256 newMultiplier,
-    bool wasFiltered,
     bytes32 referenceModelHash,
     bytes[] calldata signatures
 ) external payable;
@@ -281,7 +287,7 @@ Signed digests:
 
 | Function | Digest |
 |---|---|
-| `recordVerification` | `keccak256(abi.encode(eventHash, token, oldMultiplier, newMultiplier, wasFiltered, referenceModelHash, address(this), block.chainid))` |
+| `recordVerification` | `keccak256(abi.encode(txHash, tokenAddress, oldMultiplier, newMultiplier, claimedFiltered, claimedMultiplier, referenceModelHash, address(this), block.chainid))` — note the field order here differs from the function's own parameter order above; both are correct, independently, and are not meant to match (see `docs/recordVerification-checklist.md`) |
 | `resolveChallenge` | `keccak256(abi.encode(eventHash, challengerWins, address(this), block.chainid))` |
 | `reportDiscrepancy` | `keccak256(abi.encode(REPORT_DISCREPANCY_TAG, eventHash, reason, address(this), block.chainid))` |
 
@@ -324,6 +330,9 @@ Signed digests:
 11. **Scheduled-resend behaviour is only partially characterised.** Resends of *the same* multiplier values have been observed; an overwrite that *changes* the values has never been observed and is not claimed.
 12. **The feed listener's continuous uptime is still short.** Stability has been observed only over limited runs; long-horizon reliability is still being watched.
 13. **Writing to the mainnet registry is manual, and that is a deliberate trade, not an unfinished feature.** Detection, filter checking, L1 confirmation and the reference-model recompute all run unattended against testnet V1. Promoting an event to `GapwatchRegistryV2` on mainnet does not: each `recordVerification` call needs 2-of-3 node signatures, and the only way to have a server produce them on its own is to hold all three node keys on that one machine. That collapses the separation the 2-of-3 scheme exists to create — an attacker who reaches the box gets the whole quorum, and the threshold becomes decoration. Given the choice between a mainnet layer that writes itself and a key-isolation property that actually holds, this project keeps the isolation and signs manually. The practical consequences are stated plainly: mainnet confirmations appear only when a human runs the signing step, there is no latency guarantee on them, and at present exactly one real consensus record exists (`0x11255751af281f9179a5b19dfecfdf53a6d377d700fffd00b00531517d38d369`). The frontend reflects this by treating V1 as the live layer and V2 confirmation as an additive badge, never as the primary signal. See also #1: the node set is immutable, so this is not something a later key rotation can soften.
+14. **`recordVerification()` now cross-validates its own inputs against live on-chain state — which means there is a real, unavoidable submission-timing risk, and it has an operational mitigation, not a code one.** `claimedFiltered`/`claimedMultiplier` are checked against `isTransactionFiltered(txHash)`/`tokenAddress.uiMultiplier()` at the exact moment the transaction executes (`FilterCheckMismatch`/`NotERC8056Token`/`MultiplierMismatch` on any mismatch, before any state is touched — see the Contract Interface above). There is currently no code anywhere in this repo that calls `recordVerification()` automatically — confirmed by grepping the repo, not assumed: `scripts/backfill_known_event.py`'s own docstring says its replay stops short of the on-chain call, "outside this codebase entirely." Every `recordVerification()` call that has ever happened (the one real record in #13, and the testnet dry runs during this feature's development) was submitted by a human running `cast send` by hand. `src/reference_model.py`/`src/filter_verifier.py` already independently re-query the right on-chain functions, so the *ingredients* for a correct submission exist in `events.db` — but the gap between whenever that off-chain check ran and whenever the human actually broadcasts the transaction is real, and reusing a stale snapshot risks reverting on state drift. The mitigation that exists today is **[docs/recordVerification-checklist.md](./docs/recordVerification-checklist.md)** — a pre-flight/sign/submit/failure-recovery checklist requiring a fresh on-chain re-query immediately before every signature. It is a process control, not a code guarantee: nothing enforces that a human actually follows it. The 2-of-3 signing nodes face the same requirement now that `claimedFiltered`/`claimedMultiplier` are baked into the signed digest — a node signing off stale values produces a signature that is not wrong, just wasted, since the call reverts on the mismatch check before consensus is ever verified.
+15. **`isTransactionFiltered()` has no observed query-window limit — within the range actually tested, which is not "forever."** Live RPC testing (2026-09-18) queried the same historical transaction hash at ages ranging from 8.3 days up to 140.6 days old; every query returned cleanly, no revert, no error, no degraded behavior. This is consistent with the precompile reading from ordinary persistent chain state (see #9) rather than a short-lived cache, and means stale `txHash` values are not, on their own, a reason a filter-check would fail. It is not proof of unlimited retention: no transaction confirmed `true` (filtered) has ever been available to test past that window, so whether a *positive* filtered result ages out differently than the many negative results tested here remains untested, not assumed.
+16. **The on-chain `getVerification()` read-back test for "stores actual values, not claimed ones" can only confirm consistency, not independently prove the guarantee.** `recordVerification()` reverts on any `claimedFiltered`/`claimedMultiplier` mismatch, so by the time a call succeeds, `claimed* == actual*` by construction — a read-back after a successful call cannot, by inspecting values alone, distinguish "the contract stored the claimed value" from "the contract stored the actual value," because they are identical in that case. The real guarantee is a source-level fact (the assignment in `recordVerification()` reads from the on-chain-queried `actual` values, never from the `claimed*` parameters, checked and unit/fuzz-tested in `contracts/test/GapwatchRegistryV2FilterMultiplierAudit.t.sol`) — the read-back test documents consistency with that fact, not an independent proof of it.
 
 ---
 
@@ -360,11 +369,11 @@ Three self-audit rounds (Recon → Deep-Audit → targeted follow-ups) were run 
 
 | Suite | Result |
 |---|---|
-| Foundry (`forge test`) | 95 passed, 0 failed, 0 skipped — across 7 suites |
+| Foundry (`forge test`) | 104 passed, 0 failed, 0 skipped — across 8 suites (includes `GapwatchRegistryV2FilterMultiplierAudit.t.sol`'s 9 fuzz/invariant + reentrancy tests for the filter-check + multiplier cross-validation logic) |
 | Rust (`cargo test --features test-utils`) | 10 passed, 0 failed, 3 ignored (see TestVM note above) |
 | Invariants | 3 properties × 256 runs × 128,000 calls — solvency, ETH conservation, credited-never-exceeds-deposited |
 
-Covered: threshold boundaries, dedup by recovered address, duplicate entries in `expectedSigners`, cross-function and cross-chain signature replay, malleability boundary at exactly `n/2`, bond state-machine mutual exclusion (challenge / resolve / reclaim), reentrancy on `withdraw()`, ownership transfer and renouncement, `requiredBond` and `challengeWindow` retroactivity, and a full record → challenge → resolve → withdraw lifecycle executed live on testnet against the real Stylus verifier.
+Covered: threshold boundaries, dedup by recovered address, duplicate entries in `expectedSigners`, cross-function and cross-chain signature replay, malleability boundary at exactly `n/2`, bond state-machine mutual exclusion (challenge / resolve / reclaim), reentrancy on `withdraw()` and on the filter-check/multiplier-cross-validation staticcalls (a live malicious-token PoC, not just cited EVM spec), ownership transfer and renouncement, `requiredBond` and `challengeWindow` retroactivity, the `FilterCheckMismatch`/`NotERC8056Token`/`MultiplierMismatch` revert paths fuzzed (256 runs each) to confirm no mismatched data can ever be written, the fixed filter-check-before-multiplier-check ordering, gas linearity across the full `uint256` multiplier range (investigated, not assumed, after an early version of that test caught a real ~25,722 gas deviation that turned out to be two well-understood SSTORE zero/nonzero-class effects, not a boundary bug — see the audit test file's comments), and a full record → challenge → resolve → withdraw lifecycle executed live on testnet against the real Stylus verifier.
 
 **Not covered — stated explicitly rather than omitted**
 - `challengerWins = false` has never been executed on a live chain (Foundry only)
