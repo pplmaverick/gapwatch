@@ -34,9 +34,9 @@
       "note": "CREATE nonce collision: same address on Creditcoin CC3 Testnet is SpaceFinance's AttestorRegistry -- always qualify by 'Robinhood Chain Mainnet, chainId 4663' when referencing."
     },
     "GapwatchRegistryV2": {
-      "address": "0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137",
-      "deployed_at_tx": "0xb5dcf25a55af98daf867002d828188b739ab0bb128759c83b5307d5dd822ebb2",
-      "deployed_at": "2026-09-15",
+      "address": "0x88395FE9Ce32494C9a054F794bE6EbaE5Ec9203d",
+      "deployed_at_tx": "0x88acfa7707a7961fccac5923a33b3ee064a2d3338a73fd317e53e30836a23970",
+      "deployed_at": "2026-09-19",
       "constructor_args": {
         "nodeSet": [
           "0xEE8F1810De97636A1C73667231e0Ef23D5B36D44",
@@ -47,12 +47,38 @@
         "requiredBond": "500000000000000",
         "challengeWindow": 86400
       },
-      "note": "CREATE nonce collision: same address on Creditcoin CC3 Testnet is SpaceFinance's Outbox -- always qualify by 'Robinhood Chain Mainnet, chainId 4663' when referencing."
+      "note": "Identity confirmed on-chain (not assumed): nodeSet()/consensusVerifier()/requiredBond()/challengeWindow() all match the values above, and FILTER_PRECOMPILE() now succeeds (reverted on the previous_address deployment) confirming the filter-check + multiplier cross-validation logic is present. No known CREATE-nonce address collision found for this specific address.",
+      "previous_address": {
+        "address": "0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137",
+        "deployed_at_tx": "0xb5dcf25a55af98daf867002d828188b739ab0bb128759c83b5307d5dd822ebb2",
+        "deployed_at": "2026-09-15",
+        "replaced_reason": "併入 filter-check + multiplier 交叉驗證邏輯，因無 proxy pattern 需重新部署 -- constructor args (nodeSet/consensusVerifier/requiredBond/challengeWindow) are unchanged from this address, only the contract logic changed.",
+        "note": "Not decommissioned or emptied -- still holds its one real on-chain record (see history below). CREATE nonce collision: same address on Creditcoin CC3 Testnet is SpaceFinance's Outbox -- always qualify by 'Robinhood Chain Mainnet, chainId 4663' when referencing.",
+        "history": [
+          {
+            "event": "recordVerification",
+            "tx_hash": "0x11255751af281f9179a5b19dfecfdf53a6d377d700fffd00b00531517d38d369",
+            "block_number": 64357140,
+            "recorded_at": "2026-09-16T08:14:21Z",
+            "event_hash": "0x4ac23f2e58e2c4962dcd701c2beff581e87f3995152a29d527c07a3afd67d956",
+            "token": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+            "was_filtered": false,
+            "note": "Confirmed via a full eth_getLogs scan of this address's entire block range (deployment block 63,515,316 through 66,172,907) -- exactly one VerificationRecorded event exists, this is it. This record remains only on this previous_address; the new address above has zero records as of its own deployment."
+          }
+        ]
+      }
     },
     "MockLendingPool": {
-      "address": "0xd3256Ec6193cFD55D8E2028b9caCfABC11BA4E26",
-      "deployed_at_tx": "0xf4e314a57e2d13656b16315c45ce456fdcd5b9b8a64dd990357bb7f45e2ab549",
-      "deployed_at": "2026-09-15"
+      "address": "0x0118058C907797e37176cE1b8B5c088F4ea515d8",
+      "deployed_at_tx": "0x31da5620c6e0ea1eb2401fe51148d37c370eba98864cee80f48003665af51ffe",
+      "deployed_at": "2026-09-19",
+      "note": "Identity confirmed on-chain: registry() returns the new GapwatchRegistryV2 address above.",
+      "previous_address": {
+        "address": "0xd3256Ec6193cFD55D8E2028b9caCfABC11BA4E26",
+        "deployed_at_tx": "0xf4e314a57e2d13656b16315c45ce456fdcd5b9b8a64dd990357bb7f45e2ab549",
+        "deployed_at": "2026-09-15",
+        "replaced_reason": "Its immutable `registry` field pointed at the old GapwatchRegistryV2 address above; no setter exists (checked contracts/src/MockLendingPool.sol), so redeploying GapwatchRegistryV2 required redeploying this too to point at the new one."
+      }
     }
   }
 }

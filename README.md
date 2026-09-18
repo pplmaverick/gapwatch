@@ -14,15 +14,17 @@ Independent on-chain verification for Robinhood Chain corporate actions — watc
 
 https://gapwatch-app.vercel.app
 
-**Current mainnet contract:** GapwatchRegistryV2 `0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137` · Full deployment history, tx hashes, and constructor args: [deployment.json](./deployment.json)
+**Current mainnet contract:** GapwatchRegistryV2 `0x88395FE9Ce32494C9a054F794bE6EbaE5Ec9203d` (redeployed 2026-09-19 to add filter-check + multiplier cross-validation, no proxy pattern — see Honest Disclosures #17) · Full deployment history, tx hashes, and constructor args: [deployment.json](./deployment.json)
 
 **Deployed on Robinhood Chain (mainnet + testnet)**
 
 | Network | Contract | Address |
 |---|---|---|
 | Mainnet (4663) | ConsensusVerifier (Stylus) | `0x6A7061D3f754BB594ed5092815Ae9bD71DD185b7` ⚠️¹ |
-| Mainnet (4663) | GapwatchRegistryV2 | `0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137` ⚠️² |
-| Mainnet (4663) | MockLendingPool | `0xd3256Ec6193cFD55D8E2028b9caCfABC11BA4E26` |
+| Mainnet (4663) | GapwatchRegistryV2 | `0x88395FE9Ce32494C9a054F794bE6EbaE5Ec9203d` |
+| Mainnet (4663) | GapwatchRegistryV2 *(previous mainnet deployment, superseded 2026-09-19)* | `0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137` ⚠️² |
+| Mainnet (4663) | MockLendingPool | `0x0118058C907797e37176cE1b8B5c088F4ea515d8` |
+| Mainnet (4663) | MockLendingPool *(previous mainnet deployment, superseded 2026-09-19)* | `0xd3256Ec6193cFD55D8E2028b9caCfABC11BA4E26` |
 | Testnet (46630) | GapwatchRegistry (Tier 1+2+2.5) | `0x53f10f96e3F6443e67Af2F1b01144B7e325f006d` |
 | Testnet (46630) | MockLendingPool | `0xF764f545B4e6fF8755EEDEE64A0CFCf2Ec08a671` |
 | Testnet (46630) | Stylus feasibility scaffold | `0xef33b95c009ca3c7021c294567237ce08679c0f1` ⚠️³ |
@@ -111,16 +113,25 @@ Every record is written with a posted bond. Anyone — not only a node — may c
 | Contract | Address | Explorer |
 |---|---|---|
 | ConsensusVerifier (Stylus) | `0x6A7061D3f754BB594ed5092815Ae9bD71DD185b7` | [View Contract](https://robinhoodchain.blockscout.com/address/0x6A7061D3f754BB594ed5092815Ae9bD71DD185b7) |
-| GapwatchRegistryV2 | `0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137` | [View Contract](https://robinhoodchain.blockscout.com/address/0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137) |
-| MockLendingPool | `0xd3256Ec6193cFD55D8E2028b9caCfABC11BA4E26` | [View Contract](https://robinhoodchain.blockscout.com/address/0xd3256Ec6193cFD55D8E2028b9caCfABC11BA4E26) |
+| GapwatchRegistryV2 | `0x88395FE9Ce32494C9a054F794bE6EbaE5Ec9203d` | [View Contract](https://robinhoodchain.blockscout.com/address/0x88395FE9Ce32494C9a054F794bE6EbaE5Ec9203d) |
+| MockLendingPool | `0x0118058C907797e37176cE1b8B5c088F4ea515d8` | [View Contract](https://robinhoodchain.blockscout.com/address/0x0118058C907797e37176cE1b8B5c088F4ea515d8) |
+
+**Previous mainnet deployment (superseded 2026-09-19, not decommissioned — see Honest Disclosures #17):**
+
+| Contract | Address | Explorer |
+|---|---|---|
+| GapwatchRegistryV2 (previous) | `0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137` | [View Contract](https://robinhoodchain.blockscout.com/address/0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137) |
+| MockLendingPool (previous) | `0xd3256Ec6193cFD55D8E2028b9caCfABC11BA4E26` | [View Contract](https://robinhoodchain.blockscout.com/address/0xd3256Ec6193cFD55D8E2028b9caCfABC11BA4E26) |
 
 Deployment transactions:
 
 | Contract | Deployment tx | Activation tx |
 |---|---|---|
 | ConsensusVerifier | `0x2085b22c4f9036f07e0d6b1397879edf9a105ad349b261e210741b2eb95eba03` | `0xb184d20c82dc18cda6aea6ee77984b839dfa8e188304ffbf32bc33e173e13fba` |
-| GapwatchRegistryV2 | `0xb5dcf25a55af98daf867002d828188b739ab0bb128759c83b5307d5dd822ebb2` | — |
-| MockLendingPool | `0xf4e314a57e2d13656b16315c45ce456fdcd5b9b8a64dd990357bb7f45e2ab549` | — |
+| GapwatchRegistryV2 | `0x88acfa7707a7961fccac5923a33b3ee064a2d3338a73fd317e53e30836a23970` | — |
+| MockLendingPool | `0x31da5620c6e0ea1eb2401fe51148d37c370eba98864cee80f48003665af51ffe` | — |
+| GapwatchRegistryV2 (previous) | `0xb5dcf25a55af98daf867002d828188b739ab0bb128759c83b5307d5dd822ebb2` | — |
+| MockLendingPool (previous) | `0xf4e314a57e2d13656b16315c45ce456fdcd5b9b8a64dd990357bb7f45e2ab549` | — |
 
 `GapwatchRegistryV2` constructor arguments (all immutable except the two bond/window knobs):
 
@@ -333,6 +344,7 @@ Signed digests:
 14. **`recordVerification()` now cross-validates its own inputs against live on-chain state — which means there is a real, unavoidable submission-timing risk, and it has an operational mitigation, not a code one.** `claimedFiltered`/`claimedMultiplier` are checked against `isTransactionFiltered(txHash)`/`tokenAddress.uiMultiplier()` at the exact moment the transaction executes (`FilterCheckMismatch`/`NotERC8056Token`/`MultiplierMismatch` on any mismatch, before any state is touched — see the Contract Interface above). There is currently no code anywhere in this repo that calls `recordVerification()` automatically — confirmed by grepping the repo, not assumed: `scripts/backfill_known_event.py`'s own docstring says its replay stops short of the on-chain call, "outside this codebase entirely." Every `recordVerification()` call that has ever happened (the one real record in #13, and the testnet dry runs during this feature's development) was submitted by a human running `cast send` by hand. `src/reference_model.py`/`src/filter_verifier.py` already independently re-query the right on-chain functions, so the *ingredients* for a correct submission exist in `events.db` — but the gap between whenever that off-chain check ran and whenever the human actually broadcasts the transaction is real, and reusing a stale snapshot risks reverting on state drift. The mitigation that exists today is **[docs/recordVerification-checklist.md](./docs/recordVerification-checklist.md)** — a pre-flight/sign/submit/failure-recovery checklist requiring a fresh on-chain re-query immediately before every signature. It is a process control, not a code guarantee: nothing enforces that a human actually follows it. The 2-of-3 signing nodes face the same requirement now that `claimedFiltered`/`claimedMultiplier` are baked into the signed digest — a node signing off stale values produces a signature that is not wrong, just wasted, since the call reverts on the mismatch check before consensus is ever verified.
 15. **`isTransactionFiltered()` has no observed query-window limit — within the range actually tested, which is not "forever."** Live RPC testing (2026-09-18) queried the same historical transaction hash at ages ranging from 8.3 days up to 140.6 days old; every query returned cleanly, no revert, no error, no degraded behavior. This is consistent with the precompile reading from ordinary persistent chain state (see #9) rather than a short-lived cache, and means stale `txHash` values are not, on their own, a reason a filter-check would fail. It is not proof of unlimited retention: no transaction confirmed `true` (filtered) has ever been available to test past that window, so whether a *positive* filtered result ages out differently than the many negative results tested here remains untested, not assumed.
 16. **The on-chain `getVerification()` read-back test for "stores actual values, not claimed ones" can only confirm consistency, not independently prove the guarantee.** `recordVerification()` reverts on any `claimedFiltered`/`claimedMultiplier` mismatch, so by the time a call succeeds, `claimed* == actual*` by construction — a read-back after a successful call cannot, by inspecting values alone, distinguish "the contract stored the claimed value" from "the contract stored the actual value," because they are identical in that case. The real guarantee is a source-level fact (the assignment in `recordVerification()` reads from the on-chain-queried `actual` values, never from the `claimed*` parameters, checked and unit/fuzz-tested in `contracts/test/GapwatchRegistryV2FilterMultiplierAudit.t.sol`) — the read-back test documents consistency with that fact, not an independent proof of it.
+17. **GapwatchRegistryV2 and MockLendingPool were redeployed to mainnet on 2026-09-19 to add the filter-check + multiplier cross-validation logic (#14–#16), and this is a genuinely new contract, not an upgrade of the old one.** No proxy pattern is used anywhere in this project, so adding that logic to `recordVerification()` required a fresh `CREATE` deployment rather than an in-place upgrade — the new address (`0x88395FE9Ce32494C9a054F794bE6EbaE5Ec9203d`) shares the exact same constructor arguments as the previous one (`0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137` — node set, `consensusVerifier`, `requiredBond`, `challengeWindow` all identical, confirmed by independently calling each getter on-chain, not assumed from `deployment.json`), but is a completely separate contract with its own, separate storage. Practical consequence: the one real consensus record this project has ever written (`0x11255751af281f9179a5b19dfecfdf53a6d377d700fffd00b00531517d38d369`, recorded 2026-09-16, see #13) **stays on the previous address permanently** — it was never, and will never be, copied or migrated to the new one. The new address starts with zero records (confirmed via a full `eth_getLogs` scan immediately after deployment) until a human runs the manual 2-of-3 signing process again (`docs/recordVerification-checklist.md`) against it. `MockLendingPool` was redeployed alongside it purely because its `registry` field is `immutable` with no setter (checked in `contracts/src/MockLendingPool.sol`) — there was no way to repoint the old pool at the new registry without redeploying the pool too. Both previous-deployment addresses remain listed above, not deleted, and both are still live, queryable contracts on mainnet — "previous" describes what this project points to, not that the address stopped existing or was emptied.
 
 ---
 
