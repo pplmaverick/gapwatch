@@ -19,7 +19,7 @@ from src.filter_engine import FilterEngine
 from src.filter_verifier import check_event as filter_verifier_check
 from src.l1_confirmer import check_event as l1_confirmer_check
 from src.registry_client import event_hash_to_bytes32, registry_contract, testnet_w3
-from src.token_registry import build_registry
+from src.token_registry import build_registry, refresh_registry
 
 _log = logging.getLogger("gapwatch.main")
 
@@ -53,9 +53,15 @@ def _refresh_onchain_cache(conn) -> None:
             set_onchain_cache(conn, row["id"], verified)
 
 
-async def state_machine_loop(conn, get_current_block) -> None:
+async def state_machine_loop(conn, get_current_block, registry: set[bytes]) -> None:
     """Periodically advance every non-terminal event through filter_verifier and
-    l1_confirmer, in that order, then refresh the display-only on-chain cache."""
+    l1_confirmer, in that order, then refresh the display-only on-chain cache
+    and rescan the token factory for newly-deployed tokens.
+
+    `registry` is the exact set object FilterEngine.registry points to;
+    refresh_registry() mutates it in place, so a token deployed while this
+    process is running gets picked up on the next tick -- no restart needed.
+    """
     while True:
         await asyncio.sleep(STATE_MACHINE_INTERVAL_SECONDS)
         current_block = get_current_block()
@@ -74,6 +80,7 @@ async def state_machine_loop(conn, get_current_block) -> None:
             l1_confirmer_check(conn, event)
 
         _refresh_onchain_cache(conn)
+        refresh_registry(registry)
 
 
 async def run(url: str = MAINNET_FEED) -> None:
@@ -94,7 +101,9 @@ async def run(url: str = MAINNET_FEED) -> None:
 
     async with asyncio.TaskGroup() as tg:
         tg.create_task(feed())
-        tg.create_task(state_machine_loop(conn, lambda: shared_state["current_block"]))
+        tg.create_task(
+            state_machine_loop(conn, lambda: shared_state["current_block"], engine.registry)
+        )
 
 
 def main() -> None:
