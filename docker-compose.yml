@@ -1,6 +1,31 @@
 services:
-  gapwatch:
+  gapwatch-api:
     build: .
+    container_name: gapwatch-api
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    command: ["uv", "run", "uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       - PYTHONUNBUFFERED=1
+    ports:
+      - "8080:8000"
+    volumes:
+      - /root/gapwatch-data:/app/data
+
+  gapwatch-feed:
+    build: .
+    container_name: gapwatch-feed
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - /root/gapwatch-data:/app/data
