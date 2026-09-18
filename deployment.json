@@ -48,6 +48,19 @@
         "challengeWindow": 86400
       },
       "note": "Identity confirmed on-chain (not assumed): nodeSet()/consensusVerifier()/requiredBond()/challengeWindow() all match the values above, and FILTER_PRECOMPILE() now succeeds (reverted on the previous_address deployment) confirming the filter-check + multiplier cross-validation logic is present. No known CREATE-nonce address collision found for this specific address.",
+      "history": [
+        {
+          "event": "recordVerification",
+          "tx_hash": "0x17039804fb90dd5f6633080225bc2ff0ad080df6854377b83909b5d5da317697",
+          "block_number": 66197824,
+          "gas_used": 278500,
+          "recorded_at": "2026-09-18T11:43:06Z",
+          "event_hash": "0x4ac23f2e58e2c4962dcd701c2beff581e87f3995152a29d527c07a3afd67d956",
+          "token": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+          "was_filtered": false,
+          "note": "Manual replay of the same real NVDA event previously recorded on previous_address (see its own history below) -- claimedFiltered/claimedMultiplier re-verified fresh against isTransactionFiltered()/uiMultiplier() immediately before signing (per docs/recordVerification-checklist.md), not reused from the original 2026-09-16 submission. getVerification(event_hash) read back after the tx and confirmed to match exactly: oldMultiplier=1000000000000000000, newMultiplier=1000775159164630595, wasFiltered=false, referenceModelHash=0x8ae207fbfb36087dc227455a640727cdb1e4be5760488ad1ee2e7e20fabe80ab (same referenceModelHash as the original record on previous_address, not a placeholder). Node1/node2 signatures independently recovered locally against the signed digest and confirmed to match the real node addresses before broadcast."
+        }
+      ],
       "previous_address": {
         "address": "0x556e1cA65a003b1ffce58eDd14CE3c0c6F520137",
         "deployed_at_tx": "0xb5dcf25a55af98daf867002d828188b739ab0bb128759c83b5307d5dd822ebb2",
@@ -63,7 +76,7 @@
             "event_hash": "0x4ac23f2e58e2c4962dcd701c2beff581e87f3995152a29d527c07a3afd67d956",
             "token": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
             "was_filtered": false,
-            "note": "Confirmed via a full eth_getLogs scan of this address's entire block range (deployment block 63,515,316 through 66,172,907) -- exactly one VerificationRecorded event exists, this is it. This record remains only on this previous_address; the new address above has zero records as of its own deployment."
+            "note": "Confirmed via a full eth_getLogs scan of this address's entire block range (deployment block 63,515,316 through 66,172,907) -- exactly one VerificationRecorded event exists, this is it. This record remains only on this previous_address, permanently -- it was never and will never be copied or migrated. The same underlying real-world NVDA event was separately re-submitted (fresh claimed-value re-verification, not a raw copy) to the new address above on 2026-09-18; see its own history entry."
           }
         ]
       }
