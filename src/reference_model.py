@@ -226,7 +226,15 @@ def verify_event(conn: sqlite3.Connection, event_id: int, rpc_url: str = RPC_URL
         )
 
     full_record = {
-        "event_id": event_id,
+        # Deliberately NOT event_id: that's a SQLite AUTOINCREMENT primary
+        # key, local to whichever events.db file this row happens to live
+        # in -- it depends on insertion order, not on anything about the
+        # real-world event. Two independent databases backfilling the same
+        # real event in a different row order used to seal two different
+        # hashes for identical on-chain facts, defeating the point of an
+        # independently-reproducible hash. tx_hash is the one identifier
+        # that's actually intrinsic to the event itself.
+        "tx_hash": event["tx_hash"].lower(),
         "event_store_status": event["status"],
         **record,
     }
