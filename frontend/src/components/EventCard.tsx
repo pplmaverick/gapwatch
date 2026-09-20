@@ -19,7 +19,12 @@ interface Props {
 }
 
 export function EventCard({ event, focal, consensusConfirmed }: Props) {
-  const token = findKnownToken(event.token_address);
+  // Priority: KNOWN_TOKENS (the Balances screen's curated few), then the
+  // factory-discovered registry's symbol/name from the API response (covers
+  // every other token the pipeline has seen), then the raw address.
+  const known = findKnownToken(event.token_address);
+  const symbol = known?.symbol ?? event.symbol;
+  const name = known?.name ?? event.name;
   const backfillText = backfillLabel(event);
 
   return (
@@ -47,10 +52,10 @@ export function EventCard({ event, focal, consensusConfirmed }: Props) {
           className="font-semibold tracking-tight"
           style={{ color: focal ? "var(--foreground)" : "var(--foreground-muted)" }}
         >
-          {token ? token.symbol : shortAddress(event.token_address)}
+          {symbol ?? shortAddress(event.token_address)}
         </span>
-        {token && (
-          <span className="text-[12px] text-foreground-dim">{token.name}</span>
+        {name && (
+          <span className="text-[12px] text-foreground-dim">{name}</span>
         )}
         <span className="font-mono text-[11px] text-foreground-dim">
           {shortAddress(event.tx_hash)}
