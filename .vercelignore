@@ -1,0 +1,14 @@
+# The Vercel project's Root Directory is "frontend" -- everything else here
+# is Foundry/cargo-stylus/Python tooling irrelevant to that build. Vercel's
+# own gitignore-based exclusion doesn't reliably reach nested .gitignore
+# files (e.g. contracts-stylus/.gitignore's /target, ~1.8GB of Rust build
+# output) when `vercel` is invoked from the repo root instead of frontend/,
+# so list the heavy, unrelated directories explicitly.
+contracts-stylus/target
+contracts/lib
+contracts/out
+contracts/cache
+contracts/snapshots
+.venv
+__pycache__
+data
