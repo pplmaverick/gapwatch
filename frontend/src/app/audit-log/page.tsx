@@ -72,7 +72,16 @@ export default function AuditLogPage() {
   // Additive layer: the table below renders from V1 regardless.
   const confirmations = useConsensusConfirmations(events);
 
-  const tokensWithHistory = new Set((events ?? []).map((e) => e.token_address.toLowerCase()));
+  // Scoped to KNOWN_TOKENS (the Balances screen's 5-token list): the audit
+  // log's own events can include tokens outside that list (e.g. newly
+  // backfilled ones), and counting those here would make the "N of 5"
+  // sentence below claim more matches than the Balances screen has slots.
+  const knownAddresses = new Set(KNOWN_TOKENS.map((t) => t.address.toLowerCase()));
+  const tokensWithHistory = new Set(
+    (events ?? [])
+      .map((e) => e.token_address.toLowerCase())
+      .filter((a) => knownAddresses.has(a))
+  );
   const tokensWithoutHistory = KNOWN_TOKENS.filter(
     (t) => !tokensWithHistory.has(t.address.toLowerCase())
   );
@@ -152,8 +161,8 @@ export default function AuditLogPage() {
           {events !== null && (
             <p className="mt-6 text-[12px] leading-relaxed text-foreground-dim">
               {tokensWithHistory.size === 0
-                ? "None of the 5 tokens shown on the Balances screen have a detected event yet."
-                : `${tokensWithHistory.size} of 5 tokens shown on the Balances screen have real detected events so far (${Array.from(
+                ? `None of the ${KNOWN_TOKENS.length} tokens shown on the Balances screen have a detected event yet.`
+                : `${tokensWithHistory.size} of ${KNOWN_TOKENS.length} tokens shown on the Balances screen have real detected events so far (${Array.from(
                     tokensWithHistory
                   )
                     .map((a) => KNOWN_TOKENS.find((t) => t.address.toLowerCase() === a)?.symbol ?? a)
