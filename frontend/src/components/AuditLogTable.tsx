@@ -77,7 +77,12 @@ export function AuditLogTable({ events, confirmations }: Props) {
         </thead>
         <tbody>
           {events.map((event) => {
-            const token = findKnownToken(event.token_address);
+            // Priority: the curated KNOWN_TOKENS list (a handful of tokens
+            // the Balances screen specifically shows), then the
+            // factory-discovered registry's symbol (covers every other
+            // token the pipeline has ever seen, e.g. the six newly-found
+            // ones), then the raw address as a last resort.
+            const symbol = findKnownToken(event.token_address)?.symbol ?? event.symbol;
             const backfillText = backfillLabel(event);
             const confirmed = confirmations?.has(event.tx_hash.toLowerCase()) ?? false;
             return (
@@ -88,7 +93,7 @@ export function AuditLogTable({ events, confirmations }: Props) {
               >
                 <td className="py-3 pr-4">
                   <span className="font-medium text-foreground">
-                    {token ? token.symbol : shortAddress(event.token_address)}
+                    {symbol ?? shortAddress(event.token_address)}
                   </span>
                 </td>
                 <td className="py-3 pr-4">

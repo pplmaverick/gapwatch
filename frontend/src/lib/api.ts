@@ -45,6 +45,9 @@ export type EventSource = "live_detection" | "historical_backfill";
 export interface AuditEvent {
   id: number;
   token_address: string;
+  /** From the factory-discovered token registry; null if not (yet) known there. */
+  symbol: string | null;
+  name: string | null;
   tx_hash: string;
   block_number: number;
   detected_at: string;

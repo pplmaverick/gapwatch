@@ -16,6 +16,7 @@ Two very different sources of truth, deliberately not blended:
 
 from __future__ import annotations
 
+import json
 import sqlite3
 
 from fastapi import FastAPI, HTTPException, Query
@@ -31,6 +32,7 @@ from src.registry_client import (
     registry_v2_contract,
     testnet_w3,
 )
+from src.token_registry import DEFAULT_STATE_PATH
 
 app = FastAPI(
     title="Gapwatch API",
@@ -52,10 +54,29 @@ def _db() -> sqlite3.Connection:
     return connect(DEFAULT_DB_PATH)
 
 
-def _event_to_dict(row: sqlite3.Row) -> dict:
+def _load_token_names() -> dict[str, dict]:
+    """Read the token registry's auto-discovered symbol/name straight from
+    `token_registry_state.json` -- the same file `token_registry.py`'s
+    factory scanner writes, keyed by lowercase address. Read fresh on every
+    call (the file is small and the live feed listener updates it while
+    this process runs) rather than cached at import time, so a newly
+    discovered token's name shows up without an API restart. Missing or
+    unparseable file degrades to "no names known" rather than a 500 --
+    callers already have a token_address to fall back to."""
+    try:
+        data = json.loads(DEFAULT_STATE_PATH.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+    return data.get("tokens", {})
+
+
+def _event_to_dict(row: sqlite3.Row, token_names: dict[str, dict] | None = None) -> dict:
+    meta = (token_names or {}).get(row["token_address"].lower())
     return {
         "id": row["id"],
         "token_address": row["token_address"],
+        "symbol": meta.get("symbol") if meta else None,
+        "name": meta.get("name") if meta else None,
         "tx_hash": row["tx_hash"],
         "block_number": row["block_number"],
         "detected_at": row["detected_at"],
@@ -81,11 +102,12 @@ def list_events(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=
     conn = _db()
     rows = get_all_events(conn)
     page = rows[offset : offset + limit]
+    token_names = _load_token_names()
     return {
         "total": len(rows),
         "limit": limit,
         "offset": offset,
-        "events": [_event_to_dict(r) for r in page],
+        "events": [_event_to_dict(r, token_names) for r in page],
     }
 
 
@@ -122,7 +144,7 @@ def get_event(event_id: int, registry_source: str = _REGISTRY_SOURCE_QUERY):
     if row is None:
         raise HTTPException(status_code=404, detail=f"no event with id {event_id}")
 
-    result = _event_to_dict(row)
+    result = _event_to_dict(row, _load_token_names())
     result["onchain"] = None
 
     try:
@@ -232,4 +254,5 @@ def audit_log(status: str | None = Query(None)):
         )
     conn = _db()
     rows = get_all_events(conn, status=status)
-    return {"count": len(rows), "events": [_event_to_dict(r) for r in rows]}
+    token_names = _load_token_names()
+    return {"count": len(rows), "events": [_event_to_dict(r, token_names) for r in rows]}
