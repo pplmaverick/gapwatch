@@ -9,10 +9,19 @@ import {
   getEventDetail,
   getTokenBalance,
 } from "@/lib/api";
-import { KnownToken } from "@/lib/tokens";
 import { backfillLabel } from "@/lib/knownBackfills";
+import { useInView } from "@/lib/useInView";
 import { ConsensusBadge } from "./ConsensusBadge";
 import type { ConsensusConfirmation } from "@/lib/useConsensusConfirmations";
+
+/** Loosened from the old KnownToken (5-item hardcoded list): the full
+ *  registry from /tokens/known doesn't guarantee a symbol/name for every
+ *  address, so both are nullable here and rendered with a fallback. */
+export interface BalanceRowToken {
+  address: string;
+  symbol: string | null;
+  name: string | null;
+}
 
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -39,11 +48,17 @@ function formatDate(iso: string) {
 }
 
 interface Props {
-  token: KnownToken;
+  token: BalanceRowToken;
   holderAddress: string;
   matchedEvents: AuditEvent[];
   /** Keyed by lowercased event tx hash; empty until the V2 lookup resolves. */
   confirmations?: Map<string, ConsensusConfirmation>;
+  /** True: fetch the balance as soon as `holderAddress` is set (today's
+   *  behavior -- used for the handful of tokens shown up front). False:
+   *  wait until this row actually scrolls into view before firing the RPC
+   *  call, so an expanded ~190-row collapsed section doesn't fire that many
+   *  concurrent requests at once. */
+  eager?: boolean;
 }
 
 type BalanceState =
@@ -57,18 +72,22 @@ export function TokenRow({
   holderAddress,
   matchedEvents,
   confirmations,
+  eager = true,
 }: Props) {
   const [balance, setBalance] = useState<BalanceState>({ status: "idle" });
   const [expanded, setExpanded] = useState(false);
   const [details, setDetails] = useState<Record<number, EventDetail | "loading" | "error">>(
     {}
   );
+  const [rowRef, inView] = useInView<HTMLDivElement>();
+  const shouldFetchBalance = eager || inView;
 
   useEffect(() => {
-    if (!holderAddress) {
-      // prop 變動觸發的資料抓取流程：沒有 holderAddress 就重置回 idle，有的話
-      // 在下方先設定 loading 狀態、緊接著發送非同步請求。兩者都是刻意的狀態
-      // 設定，不是規則要抓的可疑模式。
+    if (!holderAddress || !shouldFetchBalance) {
+      // prop 變動觸發的資料抓取流程：沒有 holderAddress（或還沒該抓，見
+      // shouldFetchBalance）就重置回 idle，該抓的時候才在下方先設定 loading
+      // 狀態、緊接著發送非同步請求。兩者都是刻意的狀態設定，不是規則要抓的
+      // 可疑模式。
       // eslint-disable-next-line react-hooks/set-state-in-effect -- 非可疑的 effect 內同步 setState 模式
       setBalance({ status: "idle" });
       return;
@@ -90,7 +109,7 @@ export function TokenRow({
     return () => {
       cancelled = true;
     };
-  }, [token.address, holderAddress]);
+  }, [token.address, holderAddress, shouldFetchBalance]);
 
   function toggleExpanded() {
     const next = !expanded;
@@ -112,6 +131,7 @@ export function TokenRow({
 
   return (
     <div
+      ref={rowRef}
       className="border-b"
       style={{ borderColor: "var(--border-soft)" }}
     >
@@ -132,9 +152,11 @@ export function TokenRow({
             className="text-[14px] font-medium tracking-tight"
             style={{ color: isZero ? "var(--foreground-dim)" : "var(--foreground)" }}
           >
-            {token.symbol}
+            {token.symbol ?? shortAddress(token.address)}
           </span>
-          <span className="text-[11px] text-foreground-dim">{token.name}</span>
+          {token.name && (
+            <span className="text-[11px] text-foreground-dim">{token.name}</span>
+          )}
         </div>
 
         <span className="hidden font-mono text-[12px] text-foreground-dim sm:inline">

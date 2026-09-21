@@ -172,6 +172,29 @@ def get_event(event_id: int, registry_source: str = _REGISTRY_SOURCE_QUERY):
     return result
 
 
+@app.get("/tokens/known")
+def list_known_tokens():
+    """Screen A: the full factory-discovered token list (same source as the
+    symbol/name enrichment on /events, /events/{id} and /audit-log --
+    `token_registry_state.json`), each flagged with whether the pipeline has
+    ever recorded a real detected event for it. Lets the Balances screen show
+    every token the registry knows about instead of a hardcoded shortlist,
+    without the frontend needing its own notion of "has an event"."""
+    token_names = _load_token_names()
+    conn = _db()
+    detected = {row["token_address"].lower() for row in get_all_events(conn)}
+    tokens = [
+        {
+            "address": address,
+            "symbol": meta.get("symbol"),
+            "name": meta.get("name"),
+            "has_detected_event": address in detected,
+        }
+        for address, meta in token_names.items()
+    ]
+    return {"count": len(tokens), "tokens": tokens}
+
+
 @app.get("/tokens/{token_address}/balance/{holder_address}")
 def get_token_balance(token_address: str, holder_address: str):
     """Screen A: effective (UI-scaled) balance, read live from the token contract

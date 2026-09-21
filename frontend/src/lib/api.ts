@@ -33,6 +33,23 @@ export function getTokenBalance(tokenAddress: string, holderAddress: string) {
   );
 }
 
+/** One row of the full factory-discovered token registry (see /tokens/known). */
+export interface KnownTokenEntry {
+  address: string;
+  symbol: string | null;
+  name: string | null;
+  has_detected_event: boolean;
+}
+
+export interface KnownTokensResponse {
+  count: number;
+  tokens: KnownTokenEntry[];
+}
+
+export function getKnownTokens() {
+  return getJson<KnownTokensResponse>("/tokens/known");
+}
+
 export type EventStatus =
   | "pending"
   | "filter_check_in_progress"
