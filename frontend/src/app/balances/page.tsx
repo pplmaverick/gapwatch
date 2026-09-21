@@ -66,9 +66,6 @@ export default function BalancesPage() {
       <NavBar />
       <main className="flex-1 px-6 pt-32 pb-20 md:px-10">
         <div className="mx-auto max-w-3xl">
-          <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-foreground-muted">
-            Screen A
-          </p>
           <h1 className="text-[2.2rem] font-semibold tracking-tight text-foreground sm:text-[2.75rem]">
             Balance lookup
           </h1>
