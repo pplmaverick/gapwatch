@@ -6,7 +6,8 @@ import { FeedPoll, FeedWaveform } from "@/components/FeedWaveform";
 import { AuditLogTable } from "@/components/AuditLogTable";
 import { AuditEvent, getAuditLog } from "@/lib/api";
 import { downloadAuditLogCsv, downloadAuditLogJson } from "@/lib/download";
-import { KNOWN_TOKENS, findKnownToken } from "@/lib/tokens";
+import { findKnownToken } from "@/lib/tokens";
+import { isHistoricalBackfill } from "@/lib/knownBackfills";
 import { useConsensusConfirmations } from "@/lib/useConsensusConfirmations";
 
 const POLL_INTERVAL_MS = 5000;
@@ -72,19 +73,15 @@ export default function AuditLogPage() {
   // Additive layer: the table below renders from V1 regardless.
   const confirmations = useConsensusConfirmations(events);
 
-  // Scoped to KNOWN_TOKENS (the Balances screen's 5-token list): the audit
-  // log's own events can include tokens outside that list (e.g. newly
-  // backfilled ones), and counting those here would make the "N of 5"
-  // sentence below claim more matches than the Balances screen has slots.
-  const knownAddresses = new Set(KNOWN_TOKENS.map((t) => t.address.toLowerCase()));
-  const tokensWithHistory = new Set(
-    (events ?? [])
-      .map((e) => e.token_address.toLowerCase())
-      .filter((a) => knownAddresses.has(a))
-  );
-  const tokensWithoutHistory = KNOWN_TOKENS.filter(
-    (t) => !tokensWithHistory.has(t.address.toLowerCase())
-  );
+  // Every row in the table below already has a real detected event by
+  // definition, so "how many of the shown tokens have events" is a
+  // tautology on this page (unlike on the Balances screen, which is scoped
+  // to a fixed 5-token list and can meaningfully ask that). What's actually
+  // informative here is the live/historical split, using the same `source`
+  // field the SOURCE column itself renders from (via `isHistoricalBackfill`)
+  // so this can never drift from what the table shows.
+  const liveCount = (events ?? []).filter((e) => !isHistoricalBackfill(e)).length;
+  const historicalCount = (events ?? []).length - liveCount;
 
   return (
     <>
@@ -158,21 +155,13 @@ export default function AuditLogPage() {
             )}
           </div>
 
-          {events !== null && (
+          {events !== null && events.length > 0 && (
             <p className="mt-6 text-[12px] leading-relaxed text-foreground-dim">
-              {tokensWithHistory.size === 0
-                ? `None of the ${KNOWN_TOKENS.length} tokens shown on the Balances screen have a detected event yet.`
-                : `${tokensWithHistory.size} of ${KNOWN_TOKENS.length} tokens shown on the Balances screen have real detected events so far (${Array.from(
-                    tokensWithHistory
-                  )
-                    .map((a) => KNOWN_TOKENS.find((t) => t.address.toLowerCase() === a)?.symbol ?? a)
-                    .join(", ")}).`}{" "}
-              {tokensWithoutHistory.length > 0 &&
-                `${tokensWithoutHistory
-                  .map((t) => t.symbol)
-                  .join(
-                    ", "
-                  )} show no history here — not filtered out, simply not yet observed by this pipeline.`}
+              {liveCount === 0
+                ? `All ${historicalCount} event${historicalCount === 1 ? "" : "s"} shown here were confirmed by replaying a historical broadcast — none caught live yet.`
+                : historicalCount === 0
+                  ? `All ${liveCount} event${liveCount === 1 ? "" : "s"} shown here were caught live, straight off the sequencer feed.`
+                  : `${liveCount} of ${events.length} events shown here were caught live, straight off the sequencer feed. The remaining ${historicalCount} were confirmed by replaying a historical broadcast.`}
             </p>
           )}
         </div>
