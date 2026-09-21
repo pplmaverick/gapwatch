@@ -27,7 +27,8 @@ interface Props {
  * heading slot. Only render it when `useConsensusConfirmations` says the
  * registry actually holds the record -- the caller decides, not this component.
  */
-const FULL_LABEL = "Tier 3 consensus confirmed";
+const FULL_LABEL = "Mainnet consensus confirmed";
+const COMPACT_LABEL = "2-of-3 confirmed";
 
 export function ConsensusBadge({ eventTxHash, variant = "mark" }: Props) {
   const record = findConsensusRecord(eventTxHash);
@@ -45,7 +46,7 @@ export function ConsensusBadge({ eventTxHash, variant = "mark" }: Props) {
         className="h-[5px] w-[5px] shrink-0 rounded-full"
         style={{ background: "var(--interactive)" }}
       />
-      {variant === "compact" ? "Tier 3" : FULL_LABEL}
+      {variant === "compact" ? COMPACT_LABEL : FULL_LABEL}
     </span>
   );
 

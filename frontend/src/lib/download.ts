@@ -20,9 +20,13 @@ export function downloadAuditLogJson(events: AuditEvent[]) {
   );
 }
 
+// Kept aligned with the columns AuditLogTable actually renders (Token,
+// Status, ..., Source) -- a CSV that can't answer the same questions the
+// on-screen table can is a broken export, not a smaller one.
 const CSV_COLUMNS: (keyof AuditEvent)[] = [
   "id",
   "token_address",
+  "symbol",
   "tx_hash",
   "block_number",
   "detected_at",
@@ -30,6 +34,7 @@ const CSV_COLUMNS: (keyof AuditEvent)[] = [
   "filter_check_count",
   "last_checked_at",
   "reference_model_hash",
+  "source",
 ];
 
 function csvEscape(value: unknown): string {

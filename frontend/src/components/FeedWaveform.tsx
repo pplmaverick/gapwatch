@@ -218,8 +218,8 @@ export function FeedWaveform({ polls }: { polls: FeedPoll[] }) {
         Sequencer feed monitor — one small tick per completed{" "}
         <code>/audit-log</code> poll, so the trace advances only when a real
         request returns. A spike turns amber, labelled with the token, the
-        moment a poll returns an <code>updateMultiplier()</code> event that was
-        not in the previous response. Last 60 seconds.
+        moment a poll returns an <code>UIMultiplierUpdated</code> event that
+        was not in the previous response. Last 60 seconds.
       </p>
     </div>
   );

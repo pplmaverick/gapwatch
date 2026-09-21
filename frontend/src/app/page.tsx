@@ -4,9 +4,9 @@ import { NavBar } from "@/components/NavBar";
 import { PipelineDiagram } from "@/components/PipelineDiagram";
 
 const SHIPPED = [
-  "Tier 1+2+2.5 — GapwatchRegistry, challenge bonds and the MockLendingPool consumer, live on Robinhood Chain Testnet and running unattended",
-  "Tier 3+4 — GapwatchRegistryV2 and the Stylus ConsensusVerifier deployed to Robinhood Chain Mainnet, with the first real 2-of-3 consensus confirmation now recorded on-chain",
-  "Database + API layer (modules 6+7) reading both registries directly",
+  "On-chain registry with challenge bonds and a downstream lending-pool consumer, live on Robinhood Chain Testnet and running unattended",
+  "2-of-3 consensus registry and Stylus verifier deployed to Robinhood Chain Mainnet, with the first real consensus confirmation now recorded on-chain",
+  "API and database layer reading both registries directly",
 ];
 
 // Kept separate from SHIPPED: this is a design decision worth explaining, not

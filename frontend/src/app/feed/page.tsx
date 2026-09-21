@@ -58,8 +58,8 @@ export default function FeedPage() {
             Live event monitor
           </h1>
           <p className="mt-3 max-w-lg text-[14px] leading-relaxed text-foreground-muted">
-            Every candidate <code>updateMultiplier()</code> call this pipeline
-            has verified — whether caught live off the sequencer feed or
+            Every candidate <code>UIMultiplierUpdated</code> event this
+            pipeline has verified — whether caught live off the sequencer feed or
             confirmed by manually replaying a known historical broadcast —
             tracked through the off-chain state machine. Pending on-chain
             confirmation, not a substitute for it.
