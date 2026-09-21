@@ -7,9 +7,11 @@ deliberately doesn't name a fixed set or count.
 Read-only, presentation-only script: no chain writes, no db writes. It reads
 the reference_model_hash already stored in events.db by earlier runs of
 src/reference_model.py's verify_event() (see scripts/backfill_known_event.py
-and scripts/backfill_new_token_events.py) -- it does not recompute anything,
-unlike scripts/demo_act1_replay.py, which needs live RPC calls for its
-hours-on-chain figure. This one only needs what's already on record.
+and scripts/backfill_new_token_events.py) -- it does not recompute anything.
+Symbol/name lookup does need one live network call: it hits the deployed
+API's /tokens/known rather than reading a local token_registry_state.json,
+because nothing on a dev machine runs the factory scanner that keeps that
+file fresh (see _load_token_names()'s docstring for why that bit).
 
 Usage:
     uv run python -m scripts.demo_act4_evidence
@@ -22,14 +24,22 @@ import re
 import sqlite3
 import subprocess
 import time
+import urllib.request
 from pathlib import Path
+from urllib.error import URLError
 
 from src.event_store import DEFAULT_DB_PATH
-from src.token_registry import DEFAULT_STATE_PATH
 
 STEP_DELAY_SECONDS = 0.7
 
 CONTRACTS_DIR = Path(__file__).resolve().parent.parent / "contracts"
+
+# Same VPS the deployed frontend proxies to (see frontend/next.config.ts).
+# This is the one place that actually keeps token_registry_state.json fresh
+# -- src/token_registry.py's factory scanner only runs there, driven by
+# src/feed_listener.py's 15s tick -- so this script asks it over HTTP
+# instead of assuming a local copy of that file is current.
+GAPWATCH_API_URL = "http://46.62.246.244:8080"
 
 # Matches forge test's final summary line, e.g.:
 # "Ran 8 test suites in 19.88s (20.12s CPU time): 104 tests passed, 0 failed,
@@ -66,19 +76,30 @@ MAINNET_VERIFICATIONS_RECORDED = 2  # GapwatchRegistryV2 VerificationRecorded
 
 
 def _load_token_names() -> dict[str, dict]:
-    """Same source and same read-fresh-every-call approach as src/api.py's
-    _load_token_names(): token_registry_state.json, keyed by lowercase
-    address, written by token_registry.py's factory scanner. Not a hardcoded
-    list -- a token this script has never seen before (like NVDA today, or
-    whatever gets verified next) is covered automatically, with no second
-    place to update. Missing/unparseable file degrades to "no names known"
-    rather than crashing; callers already have a token_address to fall back
-    to."""
+    """Fetch the live token registry from the deployed API's /tokens/known
+    -- the same data src/api.py's own _load_token_names() reads server-side
+    from token_registry_state.json -- rather than reading that file locally.
+
+    Reading it locally was tried first and was wrong: nothing on a dev
+    machine runs the factory scanner (src/token_registry.py, driven by
+    src/feed_listener.py) that keeps token_registry_state.json current, so
+    a local copy is whatever it happened to be last synced from the VPS --
+    in practice, still the pre-factory-migration schema with no `tokens`
+    key at all, so every lookup silently fell back to an address fragment
+    instead of erroring. Hitting the live endpoint means this always
+    reflects the real, currently-deployed registry, on any machine.
+    Network/parse failures degrade to "no names known" rather than
+    crashing; callers already have a token_address to fall back to."""
     try:
-        data = json.loads(DEFAULT_STATE_PATH.read_text())
-    except (FileNotFoundError, json.JSONDecodeError):
+        req = urllib.request.Request(
+            f"{GAPWATCH_API_URL}/tokens/known",
+            headers={"User-Agent": "gapwatch-demo/0.1"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+    except (URLError, TimeoutError, json.JSONDecodeError, OSError):
         return {}
-    return data.get("tokens", {})
+    return {t["address"].lower(): t for t in data.get("tokens", [])}
 
 
 def _short_hash(value: str) -> str:
