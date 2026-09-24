@@ -33,6 +33,9 @@ import os
 from pathlib import Path
 from typing import Any
 
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from web3 import Web3
 
 DEFAULT_DEPLOYMENT_PATH = Path(__file__).resolve().parent.parent / "deployment.json"
@@ -74,6 +77,32 @@ _BALANCE_OF_UI_ABI = [
 #: User-Agent is set because Cloudflare's bot check (error 1010) rejects
 #: default HTTP client user-agents outright.
 _HEADERS = {"Content-Type": "application/json", "User-Agent": "gapwatch-api/0.1"}
+
+
+def _build_retrying_session() -> requests.Session:
+    """A fresh `requests.Session` per `Web3` instance, passed as `HTTPProvider`'s
+    explicit `session=` so it bypasses web3.py's own process-wide session cache
+    (keyed by thread id + URL, kept forever) -- that cache is exactly what was
+    handing every call a `requests.Session` whose pooled keep-alive connection
+    the RPC server had already closed server-side, surfacing as
+    `http.client.RemoteDisconnected`.
+
+    `allowed_methods=None` is required, not cosmetic: urllib3's `Retry` default
+    only retries methods it considers idempotent (GET/HEAD/etc), and JSON-RPC is
+    POST-only, so the out-of-the-box default silently never retried an RPC call
+    at all. Note this is also why web3.py's own built-in retry
+    (`exception_retry_configuration`) doesn't save us here either: its default
+    error tuple checks the *builtin* `ConnectionError`, not
+    `requests.exceptions.ConnectionError` (which is what a dropped keep-alive
+    connection actually raises) -- the two are unrelated classes, so that retry
+    path never triggers for this failure.
+    """
+    session = requests.Session()
+    retry = Retry(total=3, backoff_factor=0.5, allowed_methods=None)
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
 
 
 def _load_deployment() -> dict[str, Any]:
@@ -122,11 +151,23 @@ REGISTRY_V2_ADDRESS = _deployment[V2_NETWORK]["GapwatchRegistryV2"]["address"]
 
 
 def testnet_w3() -> Web3:
-    return Web3(Web3.HTTPProvider(TESTNET_RPC, request_kwargs={"headers": _HEADERS}))
+    return Web3(
+        Web3.HTTPProvider(
+            TESTNET_RPC,
+            request_kwargs={"headers": _HEADERS},
+            session=_build_retrying_session(),
+        )
+    )
 
 
 def mainnet_w3() -> Web3:
-    return Web3(Web3.HTTPProvider(MAINNET_RPC, request_kwargs={"headers": _HEADERS}))
+    return Web3(
+        Web3.HTTPProvider(
+            MAINNET_RPC,
+            request_kwargs={"headers": _HEADERS},
+            session=_build_retrying_session(),
+        )
+    )
 
 
 def registry_contract(w3: Web3):

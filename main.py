@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
+import requests
 from rhfeed import MAINNET_FEED, FeedConsumer
 
 from src.event_store import (
@@ -43,9 +44,29 @@ def _refresh_onchain_cache(conn) -> None:
     for row in get_all_events(conn):
         if row["onchain_verified_cache"]:
             continue
+        event_hash = event_hash_to_bytes32(row["tx_hash"])
         try:
-            event_hash = event_hash_to_bytes32(row["tx_hash"])
             verified = registry.functions.isVerified(event_hash).call()
+        except requests.exceptions.ConnectionError as exc:
+            # A dropped keep-alive connection (e.g. RemoteDisconnected) surfaces
+            # here as requests.exceptions.ConnectionError. The retrying session
+            # from registry_client already retries at the connection-pool level,
+            # so getting here means that was exhausted -- rebuild the Web3/
+            # registry pair (a fresh session) once and give this row one more
+            # try before giving up on it for this tick.
+            _log.warning(
+                "onchain cache refresh: connection dropped for event id=%d, "
+                "rebuilding session and retrying once: %s", row["id"], exc,
+            )
+            try:
+                w3 = testnet_w3()
+                registry = registry_contract(w3)
+                verified = registry.functions.isVerified(event_hash).call()
+            except Exception as exc2:  # noqa: BLE001 -- one bad row must not block the rest
+                _log.warning(
+                    "onchain cache refresh retry failed for event id=%d: %s", row["id"], exc2
+                )
+                continue
         except Exception as exc:  # noqa: BLE001 -- one bad row must not block the rest
             _log.warning("onchain cache refresh failed for event id=%d: %s", row["id"], exc)
             continue
