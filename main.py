@@ -13,12 +13,14 @@ from src.event_store import (
     get_all_events,
     get_events_by_status,
     get_pending_events,
+    increment_reference_model_attempts,
     insert_pending_event,
     set_onchain_cache,
 )
 from src.filter_engine import FilterEngine
 from src.filter_verifier import check_event as filter_verifier_check
 from src.l1_confirmer import check_event as l1_confirmer_check
+from src.reference_model import verify_event
 from src.registry_client import event_hash_to_bytes32, registry_contract, testnet_w3
 from src.token_registry import build_registry, refresh_registry
 
@@ -74,10 +76,78 @@ def _refresh_onchain_cache(conn) -> None:
             set_onchain_cache(conn, row["id"], verified)
 
 
+#: verify_event's own RPC helper (src/reference_model.py's `_rpc_call`) opens a
+#: fresh urllib.request connection per call rather than reusing a
+#: requests.Session, so it isn't exposed to the stale-keep-alive-connection bug
+#: `registry_client.py`'s retrying session was built for -- and it has no
+#: retry-with-backoff of its own. This tick-level cap is what stands in for
+#: that: a genuinely failing event gets retried a bounded number of times,
+#: spread ~15s apart, before this loop gives up on it.
+MAX_REFERENCE_MODEL_ATTEMPTS = 3
+
+
+def _verify_reference_model_for_l1_confirmed(conn) -> None:
+    """Run the independent reference-model recomputation (`verify_event`) on
+    every `l1_confirmed` event that doesn't have a `reference_model_hash` yet.
+
+    This writes only `reference_model_hash` (and, on failure,
+    `reference_model_verify_attempts`) to SQLite -- no on-chain call, no
+    private key involved. `recordVerification()` stays a deliberate, manual,
+    human-run step (see docs/recordVerification-checklist.md); this function
+    must never be extended to submit anything on-chain.
+
+    Guarded by `reference_model_hash IS NULL` rather than re-running every
+    tick: the reference model's inputs (the token's on-chain log/state at a
+    fixed historical block) don't change after the fact, so a hash computed
+    once for a given event never needs to be recomputed. A row that keeps
+    failing (RPC errors, not mismatches -- verify_event catches those and
+    returns `sha256=None` rather than raising) stops being retried after
+    `MAX_REFERENCE_MODEL_ATTEMPTS`, and only the first failure logs at
+    WARNING -- the rest log at DEBUG -- so a persistently-broken RPC endpoint
+    doesn't spam whatever forwards WARNING+ logs onward.
+    """
+    for event in get_events_by_status(conn, "l1_confirmed"):
+        event_id = event["id"]
+        if event["reference_model_hash"]:
+            continue
+        if event["reference_model_verify_attempts"] >= MAX_REFERENCE_MODEL_ATTEMPTS:
+            continue  # already gave up on this row; stay silent
+
+        try:
+            result = verify_event(conn, event_id)
+        except Exception as exc:  # noqa: BLE001 -- one bad row must not block the rest
+            result = None
+            rpc_failure_detail = str(exc)
+        else:
+            rpc_failure_detail = (
+                result.mismatches[0] if result.sha256 is None and result.mismatches else None
+            )
+
+        if result is None or result.sha256 is None:
+            attempts = increment_reference_model_attempts(conn, event_id)
+            log_fn = _log.warning if attempts == 1 else _log.debug
+            log_fn(
+                "reference model verify failed for event id=%d (attempt %d/%d): %s",
+                event_id, attempts, MAX_REFERENCE_MODEL_ATTEMPTS, rpc_failure_detail,
+            )
+            if attempts >= MAX_REFERENCE_MODEL_ATTEMPTS:
+                _log.warning(
+                    "reference model verify: giving up on event id=%d after %d attempts",
+                    event_id, MAX_REFERENCE_MODEL_ATTEMPTS,
+                )
+            continue
+
+        if not result.match:
+            _log.warning(
+                "reference model MISMATCH for event id=%d: %s", event_id, result.mismatches
+            )
+
+
 async def state_machine_loop(conn, get_current_block, registry: set[bytes]) -> None:
     """Periodically advance every non-terminal event through filter_verifier and
-    l1_confirmer, in that order, then refresh the display-only on-chain cache
-    and rescan the token factory for newly-deployed tokens.
+    l1_confirmer, in that order, then independently re-verify newly-l1_confirmed
+    events against the reference model, refresh the display-only on-chain
+    cache, and rescan the token factory for newly-deployed tokens.
 
     `registry` is the exact set object FilterEngine.registry points to;
     refresh_registry() mutates it in place, so a token deployed while this
@@ -100,6 +170,7 @@ async def state_machine_loop(conn, get_current_block, registry: set[bytes]) -> N
         for event in get_events_by_status(conn, "confirmed_not_filtered"):
             l1_confirmer_check(conn, event)
 
+        _verify_reference_model_for_l1_confirmed(conn)
         _refresh_onchain_cache(conn)
         refresh_registry(registry)
 

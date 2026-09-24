@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS events (
     reference_model_hash TEXT,
     onchain_verified_cache INTEGER,
     onchain_cache_updated_at TEXT,
-    source TEXT NOT NULL DEFAULT 'live_detection'
+    source TEXT NOT NULL DEFAULT 'live_detection',
+    reference_model_verify_attempts INTEGER NOT NULL DEFAULT 0
 )
 """
 
@@ -60,6 +61,7 @@ _ADDED_COLUMNS = {
     "onchain_verified_cache": "INTEGER",
     "onchain_cache_updated_at": "TEXT",
     "source": "TEXT NOT NULL DEFAULT 'live_detection'",
+    "reference_model_verify_attempts": "INTEGER NOT NULL DEFAULT 0",
 }
 
 
@@ -144,6 +146,21 @@ def set_reference_model_hash(conn: sqlite3.Connection, event_id: int, sha256_hex
         "UPDATE events SET reference_model_hash = ? WHERE id = ?", (sha256_hex, event_id)
     )
     conn.commit()
+
+
+def increment_reference_model_attempts(conn: sqlite3.Connection, event_id: int) -> int:
+    """Bump `reference_model_verify_attempts` for a failed `verify_event` call
+    and return the new count, so the caller can decide when to stop retrying
+    and de-escalate log noise."""
+    conn.execute(
+        "UPDATE events SET reference_model_verify_attempts = reference_model_verify_attempts + 1 "
+        "WHERE id = ?",
+        (event_id,),
+    )
+    conn.commit()
+    return conn.execute(
+        "SELECT reference_model_verify_attempts FROM events WHERE id = ?", (event_id,)
+    ).fetchone()[0]
 
 
 def set_source(conn: sqlite3.Connection, event_id: int, source: str) -> None:
