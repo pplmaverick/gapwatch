@@ -23,7 +23,7 @@ export const KNOWN_CONSENSUS_RECORDS: KnownConsensusRecord[] = [
     eventHash:
       "0x4ac23f2e58e2c4962dcd701c2beff581e87f3995152a29d527c07a3afd67d956",
     recordTxHash:
-      "0x11255751af281f9179a5b19dfecfdf53a6d377d700fffd00b00531517d38d369",
+      "0x17039804fb90dd5f6633080225bc2ff0ad080df6854377b83909b5d5da317697",
   },
 ];
 
