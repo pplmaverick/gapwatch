@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { requestWalletAddress } from "@/lib/ethereum";
-import { DEMO_HOLDER_ADDRESS } from "@/lib/tokens";
+import { DEMO_WALLET_ADDRESS } from "@/lib/tokens";
 
 interface Props {
   value: string;
@@ -49,10 +49,10 @@ export function AddressInput({ value, onChange }: Props) {
       <div className="flex items-center gap-3 text-[12px] text-foreground-dim">
         {error && <span className="text-red-400">{error}</span>}
         <button
-          onClick={() => onChange(DEMO_HOLDER_ADDRESS)}
+          onClick={() => onChange(DEMO_WALLET_ADDRESS)}
           className="underline decoration-dotted underline-offset-2 transition-colors hover:text-interactive"
         >
-          Try example address (largest known NVDA holder)
+          Try example wallet
         </button>
       </div>
     </div>

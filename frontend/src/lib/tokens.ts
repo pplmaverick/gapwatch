@@ -11,7 +11,7 @@ export interface KnownToken {
   address: string;
 }
 
-export const DEMO_HOLDER_ADDRESS = "0xd4eb21209c4d6093f80b5b84f5c45cc093ea14a3";
+export const DEMO_WALLET_ADDRESS = "0x3ecc75d1e53dadd383a489d30394ebc950c18208";
 
 export const KNOWN_TOKENS: KnownToken[] = [
   {
