@@ -1,10 +1,10 @@
-// Discovered live via `UIMultiplierUpdated` topic0 eth_getLogs scan against
-// Robinhood Chain mainnet (src/token_registry.py), 22 addresses total as of
-// 2026-09-14. Symbol/name read directly from each token's on-chain
-// symbol()/name(). This subset of 5 is the pair the pipeline has actually
-// verified discrepancies for (NVDA — the only token with a real detected
-// multiplier event so far) plus the four tokens named in the "announcement
-// vs. actual" narrative writeup (MSFT/XOM/AMAT/LLY).
+// Hand-picked demo subset (5 tokens), not the monitored set. The registry in
+// src/token_registry.py discovers every token the Robinhood Chain stock-token
+// factory has deployed that passes the symbol filter (203 as of 2026-10-13);
+// this list only names the tokens the demo screens show: NVDA (the one event
+// recorded in GapwatchRegistryV2) plus the four tokens named in the
+// "announcement vs. actual" narrative writeup (MSFT/XOM/AMAT/LLY).
+// Symbol/name are the tokens' on-chain symbol()/name().
 export interface KnownToken {
   symbol: string;
   name: string;
